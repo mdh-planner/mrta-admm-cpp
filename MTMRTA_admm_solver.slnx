@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="MTMRTA_admm_solver.vcxproj" Id="36394b1d-4980-4b3f-b09a-12097a6c1d5e" />
+</Solution>

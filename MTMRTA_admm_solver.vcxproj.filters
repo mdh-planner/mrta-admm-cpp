@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\domain">
+      <UniqueIdentifier>{71c35101-3e62-49f1-8855-8a018799fa75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\solver">
+      <UniqueIdentifier>{d05f9e4a-ab4e-4ee9-a0cc-b8c6f13f84bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\app">
+      <UniqueIdentifier>{2e76027a-59c9-4cd1-8ddb-ecd9c4f53e04}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\io">
+      <UniqueIdentifier>{6c76a127-708a-497e-8234-36a782ec8ee6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Solver">
+      <UniqueIdentifier>{81b53702-9276-42bf-a30d-0ead74294565}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\io">
+      <UniqueIdentifier>{04a9f0c3-a357-4e5f-9315-86f3b2612365}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\ParameterScaler.h">
+      <Filter>Header Files\solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\ScheduleRepairer.h">
+      <Filter>Header Files\solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\AdmmSolver.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\AssignmentRounder.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\DerivedDataBuilder.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\ParameterScaler.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\PrecedenceGraph.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\ScheduleRepairer.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\ScheduleScorer.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\io\InstanceLoader.cpp">
+      <Filter>Source Files\io</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\LocalSearch.h">
+      <Filter>Header Files\solver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\solver\LocalSearch.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CommonTypes.h">
+      <Filter>Header Files\domain</Filter>
+    </ClInclude>
+    <ClInclude Include="SolverParameters.h">
+      <Filter>Header Files\domain</Filter>
+    </ClInclude>
+    <ClInclude Include="src\domain\UserConfig.h">
+      <Filter>Header Files\domain</Filter>
+    </ClInclude>
+    <ClInclude Include="src\io\InstanceLoader.h">
+      <Filter>Header Files\io</Filter>
+    </ClInclude>
+    <ClInclude Include="src\domain\DerivedData.h">
+      <Filter>Header Files\domain</Filter>
+    </ClInclude>
+    <ClInclude Include="src\solver\DerivedDataBuilder.h">
+      <Filter>Header Files\solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\DistributedMrtaApp.h">
+      <Filter>Header Files\app</Filter>
+    </ClInclude>
+    <ClInclude Include="src\domain\SolutionState.h">
+      <Filter>Header Files\domain</Filter>
+    </ClInclude>
+    <ClInclude Include="src\solver\PrecedenceGraph.h">
+      <Filter>Header Files\solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\solver\AdmmSolver.h">
+      <Filter>Header Files\solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\solver\AssignmentRounder.h">
+      <Filter>Header Files\solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\solver\ScheduleScorer.h">
+      <Filter>Header Files\solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\domain\InstanceData.h">
+      <Filter>Header Files\domain</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
