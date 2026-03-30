@@ -21,6 +21,170 @@ namespace mrta {
 		: inst_(inst), opt_(options), repairer_(repairer), scorer_(scorer) {
 	}
 
+	void LocalSearch::beginOuterIteration()
+	{
+		seenAcceptedStateHashes_.clear();
+		seenEvaluatedStateHashes_.clear();
+		seenBatchNeighborhoods_.clear();
+		exhaustedRr2Combos_.clear();
+		skipCheckpointedOrderAfterBatch_ = false;
+	}
+
+	std::string LocalSearch::hashStateOrders(
+		const MatrixDouble& z,
+		const std::vector<VecInt>& ordP,
+		const std::vector<VecInt>& ordV) const
+	{
+		std::ostringstream oss;
+		oss.precision(17);
+
+		oss << "Z|";
+		for (int r = 0; r < static_cast<int>(z.size()); ++r) {
+			oss << r << ":";
+			for (int j = 0; j < static_cast<int>(z[r].size()); ++j) {
+				if (z[r][j] > 0.5) {
+					oss << j << ",";
+				}
+			}
+			oss << "|";
+		}
+
+		oss << "P|";
+		for (int r = 0; r < static_cast<int>(ordP.size()); ++r) {
+			oss << r << ":";
+			for (int j : ordP[r]) {
+				oss << j << ",";
+			}
+			oss << "|";
+		}
+
+		oss << "V|";
+		for (int r = 0; r < static_cast<int>(ordV.size()); ++r) {
+			oss << r << ":";
+			for (int j : ordV[r]) {
+				oss << j << ",";
+			}
+			oss << "|";
+		}
+
+		return oss.str();
+	}
+
+	std::string LocalSearch::hashStateOrders(const LocalSearchState& S) const
+	{
+		return hashStateOrders(S.z, S.ordP, S.ordV);
+	}
+
+	std::string LocalSearch::makeBatchMoveKey(
+		int sAnchor,
+		const VecInt& fromBatch,
+		const VecInt& toBatch) const
+	{
+		std::ostringstream oss;
+		oss << "A" << sAnchor << "|F:";
+		for (int x : fromBatch) oss << x << ",";
+		oss << "|T:";
+		for (int x : toBatch) oss << x << ",";
+		return oss.str();
+	}
+
+	std::string LocalSearch::makeBatchNeighborhoodKey(
+		const LocalSearchState& S,
+		int sAnchor,
+		const VecInt& batch,
+		const VecInt& batchPerm) const
+	{
+		std::ostringstream oss;
+
+		// Anchor-local neighborhood fingerprint, not full global state.
+		oss << "ANCHOR=" << sAnchor << "|SEQ:";
+		for (int x : S.ordP[sAnchor]) {
+			oss << x << ",";
+		}
+
+		oss << "|B:";
+		for (int x : batch) {
+			oss << x << ",";
+		}
+
+		oss << "|P:";
+		for (int x : batchPerm) {
+			oss << x << ",";
+		}
+
+		return oss.str();
+	}
+
+	bool LocalSearch::isRecentInverseBatchMove(
+		int sAnchor,
+		const VecInt& batch,
+		const VecInt& batchPerm) const
+	{
+		const std::string inverseKey = makeBatchMoveKey(sAnchor, batchPerm, batch);
+		return std::find(
+			recentAcceptedBatchMoves_.begin(),
+			recentAcceptedBatchMoves_.end(),
+			inverseKey) != recentAcceptedBatchMoves_.end();
+	}
+
+	void LocalSearch::rememberAcceptedBatchMove(
+		int sAnchor,
+		const VecInt& batch,
+		const VecInt& batchPerm)
+	{
+		recentAcceptedBatchMoves_.push_back(
+			makeBatchMoveKey(sAnchor, batch, batchPerm));
+
+		while (recentAcceptedBatchMoves_.size() > kRecentBatchTabuMax) {
+			recentAcceptedBatchMoves_.pop_front();
+		}
+	}
+
+	std::string LocalSearch::makeRr2ComboKey(
+		const MatrixDouble&,
+		const VecInt& disruptedRobots,
+		const VecInt& srToStrip,
+		const std::vector<VecInt>& combo) const
+	{
+		std::ostringstream oss;
+
+		VecInt dr = disruptedRobots;
+		VecInt sr = srToStrip;
+		std::sort(dr.begin(), dr.end());
+		std::sort(sr.begin(), sr.end());
+
+		oss << "DR:";
+		for (int r : dr) {
+			oss << r << ",";
+		}
+
+		oss << "|SR:";
+		for (int j : sr) {
+			oss << j << ",";
+		}
+
+		// Canonicalize combo entries as strings, then sort them.
+		std::vector<std::string> comboParts;
+		comboParts.reserve(combo.size());
+
+		for (const auto& sw : combo) {
+			std::ostringstream part;
+			for (int x : sw) {
+				part << x << ",";
+			}
+			comboParts.push_back(part.str());
+		}
+
+		std::sort(comboParts.begin(), comboParts.end());
+
+		oss << "|MR:";
+		for (const auto& part : comboParts) {
+			oss << "[" << part << "]";
+		}
+
+		return oss.str();
+	}
+
 	LocalSearchOutput LocalSearch::run(
 		const MatrixDouble& z0,
 		const VecDouble& theta0,
@@ -45,6 +209,10 @@ namespace mrta {
 
 		for (int outer = 0; outer < opt_.nOuter; ++outer) {
 
+			beginOuterIteration();
+			const std::string startKey = hashStateOrders(S);
+			seenAcceptedStateHashes_.insert(startKey);
+			seenEvaluatedStateHashes_.insert(startKey);
 
 			if (timeExpired()) {
 				std::cout << "LS time limit reached at outer " << outer
@@ -59,7 +227,7 @@ namespace mrta {
 			improved = improveGapWindow(S) || improved;
 			improved = improveGapFill(S) || improved;
 
-			//const bool did = improveSrAssignment(S);
+			did = improveSrAssignment(S);
 			if (did) {
 				improved = true;
 				S = polishAfterAssignment(S, opt_.POLISH_N_INNER);
@@ -456,8 +624,15 @@ namespace mrta {
 	bool LocalSearch::improveMrOrder(LocalSearchState& S)
 	{
 		bool improved = false;
-		improved = improveCoupledMrBatchOrder(S, opt_) || improved;
-		improved = improveCoupledMrOrder(S, opt_) || improved;
+
+		skipCheckpointedOrderAfterBatch_ = false;
+		const bool didBatch = improveCoupledMrBatchOrder(S, opt_);
+		improved = didBatch || improved;
+
+		if (!skipCheckpointedOrderAfterBatch_) {
+			improved = improveCoupledMrOrder(S, opt_) || improved;
+		}
+
 		return improved;
 	}
 
@@ -1169,11 +1344,11 @@ namespace mrta {
 			}
 		}
 
-		//        if (bestMksp + 1e-9 < S.mksp) {
-		S = std::move(bestS);
-		improved = true;
-		std::cout << "  Virtual-gap insertion improved: mksp=" << S.mksp << "\n";
-		//  }
+		if (bestMksp + 1e-9 < S.mksp) {
+			S = std::move(bestS);
+			improved = true;
+			std::cout << "  Virtual-gap insertion improved: mksp=" << S.mksp << "\n";
+		}
 
 		return improved;
 	}
@@ -1210,18 +1385,10 @@ namespace mrta {
 
 		double bestDelta = 0.0;
 		LocalSearchState bestS = S;
-
-		// Track already-tried (anchor, batch, permutation) combos to avoid repetition
-		std::unordered_set<std::string> triedCombos;
-
-		auto makeKey = [](int anchor, const VecInt& batch, const VecInt& perm) -> std::string {
-			std::string key = std::to_string(anchor) + "|";
-			for (int x : batch) { key += std::to_string(x) + ","; }
-			key += "|";
-			for (int x : perm) { key += std::to_string(x) + ","; }
-			return key;
-			};
-
+		int skipSeenNeighborhood = 0;
+		int skipInverseMove = 0;
+		int skipSeenCandidateState = 0;
+		int skipSeenEvaluatedState = 0;
 		int bestAnchor = -1;
 		VecInt bestBatch;
 		VecInt bestPerm;
@@ -1259,15 +1426,48 @@ namespace mrta {
 				const auto permList = buildBatchPermutations(batch, P.MR_BATCH_MAX_PERMS);
 
 				for (const auto& batchPerm : permList) {
-					const std::string key = makeKey(sAnchor, batch, batchPerm);
-					if (triedCombos.count(key)) { continue; }   // ← skip already tried
-					triedCombos.insert(key);
-					auto ordP_try = applyCoupledBatchOrder(S.ordP, S.z, batch, batchPerm, sAnchor);
+					if (batchPerm == batch) {
+						continue;
+					}
+
+					const std::string neighKey =
+						makeBatchNeighborhoodKey(S, sAnchor, batch, batchPerm);
+					if (!seenBatchNeighborhoods_.insert(neighKey).second) {
+						++skipSeenNeighborhood;
+						continue;
+					}
+
+					if (isRecentInverseBatchMove(sAnchor, batch, batchPerm)) {
+						++skipInverseMove;
+						continue;
+					}
+
+					auto ordP_try =
+						applyCoupledBatchOrder(S.ordP, S.z, batch, batchPerm, sAnchor);
+
+					if (ordP_try[sAnchor] == S.ordP[sAnchor]) {
+						continue;
+					}
+
+					const std::string candStateKey =
+						hashStateOrders(S.z, ordP_try, S.ordV);
+					if (seenEvaluatedStateHashes_.find(candStateKey) != seenEvaluatedStateHashes_.end()) {
+						++skipSeenCandidateState;
+						continue;
+					}
+					seenEvaluatedStateHashes_.insert(candStateKey);
 
 					LocalSearchState St;
 					if (!evaluateState(S, S.z, &ordP_try, &S.ordV, true, P.nRepairFrozen, St)) {
 						continue;
 					}
+
+					const std::string evalStateKey = hashStateOrders(St);
+					if (seenEvaluatedStateHashes_.find(evalStateKey) != seenEvaluatedStateHashes_.end()) {
+						++skipSeenEvaluatedState;
+						continue;
+					}
+					seenEvaluatedStateHashes_.insert(evalStateKey);
 
 					const double delta = S.mksp - St.mksp;
 					if (delta > bestDelta + 1e-9) {
@@ -1281,12 +1481,17 @@ namespace mrta {
 			}
 		}
 
-		if (bestDelta > 1e-9) {
+		if (bestDelta > 1e-3) {
+			const std::string acceptedKey = hashStateOrders(bestS);
+			seenAcceptedStateHashes_.insert(acceptedKey);
+			seenEvaluatedStateHashes_.insert(acceptedKey);
+
 			S = std::move(bestS);
 			improved = true;
+			skipCheckpointedOrderAfterBatch_ = true;
+			rememberAcceptedBatchMove(bestAnchor, bestBatch, bestPerm);
 
-			std::cout << "  Coupled-MR-batch improved: anchor R" << bestAnchor << " | batch [";
-			for (size_t i = 0; i < bestBatch.size(); ++i) {
+			std::cout << "  Coupled-MR-batch improved: anchor R" << bestAnchor << " | batch ["; for (size_t i = 0; i < bestBatch.size(); ++i) {
 				std::cout << bestBatch[i] << (i + 1 < bestBatch.size() ? " " : "");
 			}
 			std::cout << "] -> [";
@@ -1294,6 +1499,15 @@ namespace mrta {
 				std::cout << bestPerm[i] << (i + 1 < bestPerm.size() ? " " : "");
 			}
 			std::cout << "] | mksp=" << S.mksp << "\n";
+		}
+
+
+		if (skipSeenNeighborhood > 0 || skipInverseMove > 0 ||
+			skipSeenCandidateState > 0 || skipSeenEvaluatedState > 0) {
+			std::cout << "    MR-batch skips: neigh=" << skipSeenNeighborhood
+				<< " inverse=" << skipInverseMove
+				<< " candState=" << skipSeenCandidateState
+				<< " evalState=" << skipSeenEvaluatedState << "\n";
 		}
 
 		return improved;
@@ -1376,10 +1590,23 @@ namespace mrta {
 					continue;
 				}
 
+				const std::string candStateKey =
+					hashStateOrders(S_work.z, ordP_try, S_work.ordV);
+				if (seenEvaluatedStateHashes_.find(candStateKey) != seenEvaluatedStateHashes_.end()) {
+					continue;
+				}
+				seenEvaluatedStateHashes_.insert(candStateKey);
+
 				LocalSearchState S_try;
 				if (!evaluateState(S_work, S_work.z, &ordP_try, &S_work.ordV, true, P.nRepairFrozen, S_try)) {
 					continue;
 				}
+
+				const std::string evalStateKey = hashStateOrders(S_try);
+				if (seenEvaluatedStateHashes_.find(evalStateKey) != seenEvaluatedStateHashes_.end()) {
+					continue;
+				}
+				seenEvaluatedStateHashes_.insert(evalStateKey);
 
 				S_work = S_try;
 				movedTasks.push_back(j);
@@ -1739,6 +1966,7 @@ namespace mrta {
 		VecInt bestSrTasks;
 		int totalDeep = 0;
 		int totalSkip = 0;
+		int totalComboExhausted = 0;
 
 		std::unordered_map<std::string, double> evalCache;
 
@@ -1897,6 +2125,16 @@ namespace mrta {
 					continue;
 				}
 
+				const std::string comboKey =
+					makeRr2ComboKey(z_mr, disruptedRobots, srToStrip, combo);
+
+				if (exhaustedRr2Combos_.find(comboKey) != exhaustedRr2Combos_.end()) {
+					++totalSkip;
+					++totalComboExhausted;
+					std::cout << "      RR2 combo skipped: exhausted\n";
+					continue;
+				}
+
 				if (trial == 0) {
 					std::cout << "    RR2 combo " << mc
 						<< ": MR swaps=" << combo.size()
@@ -2008,6 +2246,14 @@ namespace mrta {
 						<< " tasks (new=" << nScreened
 						<< ", cached=" << nCheapHit << ")\n";
 
+				
+
+					if (nScreened == 0) {
+						exhaustedRr2Combos_.insert(comboKey);
+						std::cout << "      RR2 combo marked exhausted\n";
+						continue;
+					}
+
 					std::vector<int> sortIdx(nAssign);
 					std::iota(sortIdx.begin(), sortIdx.end(), 0);
 					std::sort(sortIdx.begin(), sortIdx.end(), [&](int a, int b) {
@@ -2047,20 +2293,23 @@ namespace mrta {
 							bestSrTasks = srToStrip;
 							bestMrSwaps = combo;
 
-							std::cout << "    RR2 exhaust[" << nDeepDone
-								<< "/" << opt_.RR2_EXHAUST_TOP_K
-								<< "]: delta=" << delta
-								<< " mksp=" << evalRes.second
-								<< " | cheap=" << cheapMksp[aa] << "\n";
+							std::cout << "  RR2: no improvement found ("
+								<< opt_.RR2_NUM_TRIALS << " trials, "
+								<< totalDeep << " deep evals, "
+								<< totalSkip << " skipped, "
+								<< totalComboExhausted << " combo-exhausted)\n";
 						}
 					}
 				}
 				else {
+					bool anyNewEval = false;
+
 					MatrixDouble z_greedy = buildGreedyAssignment(
 						z_stripped, srPhysStripped, srVirtStripped, capLists, virtCapLists);
 
 					std::string zHash = hashAssignment(z_greedy);
 					if (evalCache.find(zHash) == evalCache.end()) {
+						anyNewEval = true;
 						const auto evalRes = deepEval(z_greedy, S);
 						++totalDeep;
 						evalCache[zHash] = evalRes.second;
@@ -2091,6 +2340,7 @@ namespace mrta {
 							continue;
 						}
 
+						anyNewEval = true;
 						const auto evalRes = deepEval(z_pert, S);
 						++totalDeep;
 						evalCache[zHash] = evalRes.second;
@@ -2106,6 +2356,10 @@ namespace mrta {
 								<< "]: delta=" << delta
 								<< " mksp=" << evalRes.second << "\n";
 						}
+					}
+
+					if (!anyNewEval) {
+						exhaustedRr2Combos_.insert(comboKey);
 					}
 				}
 			}
@@ -2521,6 +2775,14 @@ namespace mrta {
 			return { SBase, std::numeric_limits<double>::infinity() };
 		}
 
+		// Snapshot outer-search caches so RR2 local polishing does not pollute them.
+		auto savedSeenAcceptedStateHashes = self.seenAcceptedStateHashes_;
+		auto savedSeenEvaluatedStateHashes = self.seenEvaluatedStateHashes_;
+		auto savedSeenBatchNeighborhoods = self.seenBatchNeighborhoods_;
+		auto savedExhaustedRr2Combos = self.exhaustedRr2Combos_;
+		auto savedRecentAcceptedBatchMoves = self.recentAcceptedBatchMoves_;
+		const bool savedSkipCheckpointedOrderAfterBatch = self.skipCheckpointedOrderAfterBatch_;
+
 		self.improveIntraOrder(Sout, opt_.RR2_POLISH_N_INNER);
 
 		LocalSearchOptions Pmr = opt_;
@@ -2533,6 +2795,14 @@ namespace mrta {
 
 		self.improveCoupledMrBatchOrder(Sout, Pmr);
 		self.improveCoupledMrOrder(Sout, Pmr);
+
+		// Restore outer-search caches.
+		self.seenAcceptedStateHashes_ = std::move(savedSeenAcceptedStateHashes);
+		self.seenEvaluatedStateHashes_ = std::move(savedSeenEvaluatedStateHashes);
+		self.seenBatchNeighborhoods_ = std::move(savedSeenBatchNeighborhoods);
+		self.exhaustedRr2Combos_ = std::move(savedExhaustedRr2Combos);
+		self.recentAcceptedBatchMoves_ = std::move(savedRecentAcceptedBatchMoves);
+		self.skipCheckpointedOrderAfterBatch_ = savedSkipCheckpointedOrderAfterBatch;
 
 		return { Sout, Sout.mksp };
 	}
@@ -2548,6 +2818,14 @@ namespace mrta {
 			return { SBase, std::numeric_limits<double>::infinity() };
 		}
 
+		// Snapshot outer-search caches so RR2 local polishing does not pollute them.
+		auto savedSeenAcceptedStateHashes = self.seenAcceptedStateHashes_;
+		auto savedSeenEvaluatedStateHashes = self.seenEvaluatedStateHashes_;
+		auto savedSeenBatchNeighborhoods = self.seenBatchNeighborhoods_;
+		auto savedExhaustedRr2Combos = self.exhaustedRr2Combos_;
+		auto savedRecentAcceptedBatchMoves = self.recentAcceptedBatchMoves_;
+		const bool savedSkipCheckpointedOrderAfterBatch = self.skipCheckpointedOrderAfterBatch_;
+
 		self.improveIntraOrder(Sout, 25);
 
 		LocalSearchOptions Pmr = opt_;
@@ -2561,6 +2839,14 @@ namespace mrta {
 		self.improveGapWindow(Sout);
 		self.improveGapFill(Sout);
 		self.improveIntraOrder(Sout, 15);
+
+		// Restore outer-search caches.
+		self.seenAcceptedStateHashes_ = std::move(savedSeenAcceptedStateHashes);
+		self.seenEvaluatedStateHashes_ = std::move(savedSeenEvaluatedStateHashes);
+		self.seenBatchNeighborhoods_ = std::move(savedSeenBatchNeighborhoods);
+		self.exhaustedRr2Combos_ = std::move(savedExhaustedRr2Combos);
+		self.recentAcceptedBatchMoves_ = std::move(savedRecentAcceptedBatchMoves);
+		self.skipCheckpointedOrderAfterBatch_ = savedSkipCheckpointedOrderAfterBatch;
 
 		return { Sout, Sout.mksp };
 	}
