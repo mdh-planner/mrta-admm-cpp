@@ -313,7 +313,7 @@ namespace mrta {
                     const int predIdx = mapFileIdToLocal[predKey];
                     // MATLAB stores [j, i] meaning task j depends on i.
                     // Internal C++ edge is i -> j.
-                    out.predPairs.push_back(PrecedenceEdge{ .from = predIdx, .to = j });
+                    out.predPairs.push_back(PrecedenceEdge{ .from = j, .to = predIdx });
                 }
 
                 if (row.size() >= 7) {

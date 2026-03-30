@@ -15,6 +15,7 @@ namespace mrta {
         int nSR = 0;
         int nVirt = 0;
 
+
         for (int j = 0; j < instance.n; ++j) {
             if (instance.isVirtual[j]) {
                 ++nVirt;
@@ -26,6 +27,8 @@ namespace mrta {
                 ++nSR;
             }
         }
+
+        const double scale = std::sqrt(static_cast<double>(instance.m * instance.n) / 48.0);
 
         (void)nVirt;
 
@@ -58,8 +61,16 @@ namespace mrta {
 
         LSP.mrBatchNTrials = std::max(8, 3 * nMR);
         LSP.mrMoveNumBatchTrials = std::max(5, 2 * nMR);
-        LSP.mrBatchK = std::min(4, std::max(2, static_cast<int>(std::lround(static_cast<double>(nMR) / 3.0))));
-        LSP.mrBatchMaxPerms = std::min(24, std::max(12, 4 * nMR));
+        
+        // Fix — allow k up to nMR for small instances:
+        LSP.mrBatchK = (nMR <= 10)
+            ? nMR
+            : std::min(4, std::max(2, static_cast<int>(std::lround(
+                static_cast<double>(nMR) / 3.0))));
+        // Fix:
+        LSP.mrBatchMaxPerms = (nMR <= 8)
+            ? 120                    // covers 5! = 120 for full sequence attempts
+            : std::min(24, std::max(12, 4 * nMR)); 
         LSP.mrMoveMaxTasks = std::max(10, nMR);
         LSP.mrMoveMaxPosTrials = std::max(4, static_cast<int>(std::lround(static_cast<double>(instance.m) / 2.0)));
 
@@ -95,9 +106,15 @@ namespace mrta {
         LSP.rr2NumTrials = 3;
         LSP.rr2MaxMrCombos = 10;
         LSP.rr2NumPerturbations = 3;
-        LSP.rr2PolishNInner = 15;
-        LSP.rr2ExhaustLimit = 1000;
-        LSP.rr2ExhaustTopK = 10;
+        //LSP.rr2PolishNInner = 10;
+        //LSP.rr2ExhaustLimit = 500; //afects performance a lot
+        //LSP.rr2ExhaustTopK = 15;
+
+       
+
+        LSP.rr2PolishNInner = std::max(3, std::min(20, static_cast<int>(std::round(10.0 * scale))));
+        LSP.rr2ExhaustLimit = std::max(100, std::min(5000, static_cast<int>(std::round(500.0 * scale))));
+        LSP.rr2ExhaustTopK = std::max(5, std::min(50, static_cast<int>(std::round(15.0 * scale))));
 
         LSP.nRepairInit = AP.nRepair;
         LSP.nRepairFrozen = AP.nRepair;

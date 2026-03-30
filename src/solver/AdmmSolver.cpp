@@ -86,6 +86,8 @@ namespace mrta {
         VecDouble capCount(m, 1.0);
         VecDouble scarcityRobot(m, 1.0);
 
+       
+
         for (int j = 0; j < n; ++j) {
             int cnt = 0;
             for (int s = 0; s < m; ++s) {
@@ -368,7 +370,7 @@ namespace mrta {
                     << " | max load=" << maxLoad
                     << '\n';
             }
-
+           
             if (rCard < AP.tolCard && rSync < tolSync) {
                 converged = true;
                 lastIter = it + 1;
@@ -381,7 +383,7 @@ namespace mrta {
         histSync.resize(lastIter);
 
         return AdmmResult{ z, theta, converged, histCard, histSync };
-    }
+ }
 
     VecDouble AdmmSolver::projectBoxedSimplex(
         const VecDouble& v,

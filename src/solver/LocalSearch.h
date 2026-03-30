@@ -59,6 +59,7 @@ namespace mrta {
         bool RR2_ALSO_PURE_SR{ true };
         bool RR2_ALSO_VIRT{ true };
         int RR2_POLISH_N_INNER{ 15 };
+        double timeLimitSeconds{ std::numeric_limits<double>::infinity() };
     };
 
     struct LocalSearchState {
@@ -147,6 +148,7 @@ namespace mrta {
         bool improveMrReallocation(LocalSearchState& S);
         bool improveVirtualGapInsertion(LocalSearchState& S);
         bool improveRuinRecreate(LocalSearchState& S);
+       
 
     private:
         bool improveCoupledMrBatchOrder(LocalSearchState& S, const LocalSearchOptions& P);
