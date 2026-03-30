@@ -2246,7 +2246,13 @@ namespace mrta {
 						<< " tasks (new=" << nScreened
 						<< ", cached=" << nCheapHit << ")\n";
 
-				
+					// If this neighborhood is mostly cached already, do not spend more effort here.
+					if (nScreened <= 2 && nCheapHit >= nAssign - 2) {
+						exhaustedRr2Combos_.insert(comboKey);
+						std::cout << "      RR2 combo marked exhausted (cache-dominated)\n";
+						continue;
+					}
+
 
 					if (nScreened == 0) {
 						exhaustedRr2Combos_.insert(comboKey);
@@ -2280,6 +2286,18 @@ namespace mrta {
 						}
 						z_try = assignVirtuals(z_try, srVirtStripped, virtCapLists);
 
+						LocalSearchState Squick;
+						if (!evaluateState(S, z_try, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
+							continue;
+						}
+
+						// Skip obviously bad candidates before deep/thorough evaluation.
+						if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
+							++totalSkip;
+							evalCache[zHash] = Squick.mksp;  // optional: cache cheap result
+							continue;
+						}
+
 						++nDeepDone;
 						const auto evalRes = (nDeepDone == 1) ? thoroughEval(z_try, S) : deepEval(z_try, S);
 
@@ -2310,21 +2328,32 @@ namespace mrta {
 					std::string zHash = hashAssignment(z_greedy);
 					if (evalCache.find(zHash) == evalCache.end()) {
 						anyNewEval = true;
-						const auto evalRes = deepEval(z_greedy, S);
-						++totalDeep;
-						evalCache[zHash] = evalRes.second;
-
-						const double delta = S.mksp - evalRes.second;
-						if (delta > bestDelta + 1e-9) {
-							bestDelta = delta;
-							bestS = evalRes.first;
-							bestSrTasks = srToStrip;
-							bestMrSwaps = combo;
-
-							std::cout << "    RR2 greedy: delta=" << delta
-								<< " mksp=" << evalRes.second
-								<< " | MR swaps=" << combo.size() << "\n";
+						LocalSearchState Squick;
+						if (!evaluateState(S, z_greedy, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
+							++totalSkip;
 						}
+						else if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
+							++totalSkip;
+							evalCache[zHash] = Squick.mksp;
+						}
+						else {
+							const auto evalRes = deepEval(z_greedy, S);
+							++totalDeep;
+							evalCache[zHash] = evalRes.second;
+
+							const double delta = S.mksp - evalRes.second;
+							if (delta > bestDelta + 1e-9) {
+								bestDelta = delta;
+								bestS = evalRes.first;
+								bestSrTasks = srToStrip;
+								bestMrSwaps = combo;
+
+								std::cout << "    RR2 greedy: delta=" << delta
+									<< " mksp=" << evalRes.second
+									<< " | MR swaps=" << combo.size() << "\n";
+							}
+						}
+
 					}
 					else {
 						++totalSkip;
@@ -2341,6 +2370,18 @@ namespace mrta {
 						}
 
 						anyNewEval = true;
+						LocalSearchState Squick;
+						if (!evaluateState(S, z_pert, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
+							++totalSkip;
+							continue;
+						}
+
+						if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
+							++totalSkip;
+							evalCache[zHash] = Squick.mksp;
+							continue;
+						}
+
 						const auto evalRes = deepEval(z_pert, S);
 						++totalDeep;
 						evalCache[zHash] = evalRes.second;
@@ -2793,9 +2834,16 @@ namespace mrta {
 		Pmr.MR_MOVE_MAX_POS_TRIALS = 1;
 		Pmr.MR_MOVE_BATCH_SIZE = 1;
 
-		self.improveCoupledMrBatchOrder(Sout, Pmr);
-		self.improveCoupledMrOrder(Sout, Pmr);
-
+		// Only do MR polishing if the candidate is not already much worse than the base.
+		if (Sout.mksp <= SBase.mksp + opt_.RR2_POLISH_MAX_DEGRADATION) {
+			self.improveCoupledMrBatchOrder(Sout, Pmr);
+			self.improveCoupledMrOrder(Sout, Pmr);
+		}
+		else {
+			std::cout << "      deepEval: skipped MR polish (mksp="
+				<< Sout.mksp << ", base=" << SBase.mksp
+				<< ", max degradation=" << opt_.RR2_POLISH_MAX_DEGRADATION << ")\n";
+		}
 		// Restore outer-search caches.
 		self.seenAcceptedStateHashes_ = std::move(savedSeenAcceptedStateHashes);
 		self.seenEvaluatedStateHashes_ = std::move(savedSeenEvaluatedStateHashes);
@@ -2834,11 +2882,13 @@ namespace mrta {
 		Pmr.MR_MOVE_NUM_BATCH_TRIALS = std::min(2, opt_.MR_MOVE_NUM_BATCH_TRIALS);
 		Pmr.MR_MOVE_MAX_POS_TRIALS = std::min(2, opt_.MR_MOVE_MAX_POS_TRIALS);
 
-		self.improveCoupledMrBatchOrder(Sout, Pmr);
-		self.improveCoupledMrOrder(Sout, Pmr);
-		self.improveGapWindow(Sout);
-		self.improveGapFill(Sout);
-		self.improveIntraOrder(Sout, 15);
+		if (Sout.mksp <= SBase.mksp + opt_.RR2_POLISH_MAX_DEGRADATION) {
+			self.improveCoupledMrBatchOrder(Sout, Pmr);
+			self.improveCoupledMrOrder(Sout, Pmr);
+			self.improveGapWindow(Sout);
+			self.improveGapFill(Sout);
+			self.improveIntraOrder(Sout, 15);
+		}
 
 		// Restore outer-search caches.
 		self.seenAcceptedStateHashes_ = std::move(savedSeenAcceptedStateHashes);

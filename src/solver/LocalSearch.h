@@ -61,6 +61,8 @@ namespace mrta {
 		bool RR2_ALSO_PURE_SR{ true };
 		bool RR2_ALSO_VIRT{ true };
 		int RR2_POLISH_N_INNER{ 15 };
+		double RR2_POLISH_MAX_DEGRADATION = 25.0;
+		double RR2_EVAL_MAX_DEGRADATION = 100.0;
 		double timeLimitSeconds{ std::numeric_limits<double>::infinity() };
 	};
 
