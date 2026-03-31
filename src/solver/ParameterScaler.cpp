@@ -155,7 +155,7 @@ namespace mrta {
         // Number of outer LS passes.
         // Higher -> more neighborhood passes, potentially better solutions, slower runtime.
         // Lower -> faster but less exploration.
-        LSP.nOuter = 20 + 5 * instance.m;
+        LSP.nOuter = 5;
 
         // Number of inner order-improvement attempts.
         // Higher -> stronger route/order polishing, slower.
@@ -279,7 +279,7 @@ namespace mrta {
         // Number of repair iterations used in relocation-style evaluations.
         // Higher -> more accurate repaired candidate evaluation.
         // Lower -> faster but rougher estimates.
-        LSP.nRepairReloc = 110;
+        LSP.nRepairReloc = 15;
 
         // Backtracking depth in RR dive search.
         // Higher -> more combinational search.
@@ -338,8 +338,8 @@ namespace mrta {
         // Number of top screened RR2 candidates sent to deep evaluation in exhaustive mode.
         // Higher -> more deep checks, slower but possibly better.
         // Lower -> faster but may miss recoverable candidates.
-        LSP.rr2ExhaustTopK = std::max(5, std::min(50, static_cast<int>(std::round(15.0 * scale))));
-
+        LSP.rr2ExhaustTopK = std::max(30, std::min(50,
+            static_cast<int>(std::round(25.0 * scale))));  // was max(10,...)
         // Number of repair iterations for the initial LS state.
         // Higher -> better initial feasibility polishing.
         // Lower -> faster startup.
@@ -353,14 +353,14 @@ namespace mrta {
         // Maximum allowed degradation over current incumbent before RR2 deep/thorough polish is skipped.
         // Higher -> more candidates receive expensive polishing.
         // Lower -> cheaper RR2, but more aggressive pruning.
-        LSP.rr2PolishMaxDegradation = 150.0;
+        LSP.rr2PolishMaxDegradation = 0;
 
         // Maximum allowed degradation for a cheap RR2 candidate before it is skipped
         // before deep/thorough evaluation.
         //
         // Higher -> more candidates survive to deepEval/thoroughEval.
         // Lower -> stronger pruning and faster runtime.
-        LSP.rr2EvalMaxDegradation = 300.0;
+        LSP.rr2EvalMaxDegradation = 0;
 
         // If the exhaustive RR2 neighborhood is already mostly cached and only a very small
         // number of new candidates remain, mark the combo as exhausted.
@@ -423,7 +423,7 @@ namespace mrta {
         // Higher -> more accurate relocation evaluation.
         // Lower -> cheaper.
         LSP.relocateMrMoveMaxPos = 2;
-
+     
         return out;
     }
 

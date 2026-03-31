@@ -61,10 +61,10 @@ namespace mrta {
 		bool RR2_ALSO_PURE_SR{ true };
 		bool RR2_ALSO_VIRT{ true };
 		int RR2_POLISH_N_INNER{ 15 };
-		double RR2_CACHE_DOMINATED_MAX_NEW = 2;
+		double RR2_CACHE_DOMINATED_MAX_NE = 2;
 		double RR2_EVAL_MAX_DEGRADATION = 100.0;
 		double RR2_POLISH_MAX_DEGRADATION = RR2_EVAL_MAX_DEGRADATION * 0.5;
-
+		int RR2_CACHE_DOMINATED_MAX_NEW = 50;
 		double timeLimitSeconds{ std::numeric_limits<double>::infinity() };
 		// Preset overrides for inline option structs
 		int  polishMrBatchTrials{ 8 };
@@ -261,11 +261,15 @@ namespace mrta {
 
 		std::pair<LocalSearchState, double> deepEval(
 			const MatrixDouble& zTry,
-			const LocalSearchState& SBase) const;
+			const LocalSearchState& SBase,
+			const std::vector<VecInt>* ordPHint = nullptr,
+			const std::vector<VecInt>* ordVHint = nullptr) const;
 
 		std::pair<LocalSearchState, double> thoroughEval(
 			const MatrixDouble& zTry,
-			const LocalSearchState& SBase) const;
+			const LocalSearchState& SBase,
+			const std::vector<VecInt>* ordPHint = nullptr,
+			const std::vector<VecInt>* ordVHint = nullptr) const;
 
 		std::vector<std::vector<int>> enumerateAllAssignments(
 			const std::vector<VecInt>& capLists) const;

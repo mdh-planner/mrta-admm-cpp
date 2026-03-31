@@ -202,8 +202,9 @@ namespace mrta {
 			};
 
 		LocalSearchState S = buildInitialState(z0, theta0, t0);
-
+		std::cout << std::endl; std::cout << std::endl;
 		std::cout << "LS init: mksp = " << S.mksp << "\n";
+		//std::cout << std::endl;
 
 		double mkspPrev = S.mksp;
 
@@ -238,14 +239,15 @@ namespace mrta {
 				improved = true;
 				S = polishAfterAssignment(S, opt_.POLISH_N_INNER);
 			}
-
+			std::cout << std::endl;
+			std::cout << "------- Starting Ruin&Recreate -------" << std::endl;
 			did = improveRuinRecreate(S);
 			if (did) {
 				improved = true;
 				S = polishAfterAssignment(S, opt_.POLISH_N_INNER);
 			}
-
-
+			std::cout << "------- Ending Ruin&Recreate -------" << std::endl;
+			std::cout << std::endl;
 			improveVirtualGapInsertion(S);
 
 			std::cout << "LS outer " << (outer + 1)
@@ -271,6 +273,7 @@ namespace mrta {
 		if (!timeExpired()) {
 			improveVirtualGapInsertion(S);
 		}
+		std::cout << std::endl;
 		std::cout << "LS finished: real mksp = " << S.mksp
 			<< " elapsed = " << elapsedSeconds() << "s\n";
 
@@ -451,10 +454,12 @@ namespace mrta {
 		improveGapWindow(S);
 
 		const double delta = mkspBefore - S.mksp;
-		if (delta > 1e-9) {
+		if (delta > 0) {
+#if VERBOSE
 			std::cout << "    Polish: " << delta
 				<< " improvement (" << mkspBefore
 				<< " -> " << S.mksp << ")\n";
+#endif
 		}
 
 		return S;
@@ -463,6 +468,7 @@ namespace mrta {
 	bool LocalSearch::improveIntraOrder(LocalSearchState& S, int nInnerOrder)
 	{
 		bool improved = false;
+		auto prevBestMksp = S.mksp;
 
 		for (int s = 0; s < m(); ++s) {
 			VecInt seqBase = S.ordP[s];
@@ -616,8 +622,13 @@ namespace mrta {
 					break;
 				}
 			}
+
+			
 		}
 
+		if (improved) {
+			std::cout << "mksp = " << S.mksp << " | improveIntraOrder improved mksp from: " << prevBestMksp << " to " << S.mksp << std::endl;
+		}
 		return improved;
 	}
 
@@ -812,10 +823,11 @@ namespace mrta {
 			} while (std::next_permutation(permWin.begin(), permWin.end()));
 		}
 
-		if (bestDelta > 1e-9) {
+		if (bestDelta > 0) {
+			std::cout << "mksp = " << bestS.mksp << " | improveGapWindow move improved mksp from " << S.mksp << " to " << bestS.mksp << "\n";
 			S = std::move(bestS);
 			improved = true;
-			std::cout << "  Gap-window improved: mksp=" << S.mksp << "\n";
+			
 		}
 
 		return improved;
@@ -973,10 +985,11 @@ namespace mrta {
 			}
 		}
 
-		if (bestDelta > 1e-9) {
+		if (bestDelta > 0) {
+			std::cout << "mksp = " << bestS.mksp << " | improveGapFill move improved mksp from " << S.mksp << " to " << bestS.mksp << "\n";
 			S = std::move(bestS);
 			improved = true;
-			std::cout << "  Gap-fill move improved: mksp=" << S.mksp << "\n";
+			
 		}
 
 		return improved;
@@ -1278,13 +1291,15 @@ namespace mrta {
 			}
 		}
 
-		if (bestDelta > 1e-9) {
+		if (bestDelta > 0) {
+			std::cout << "mksp = " << bestS.mksp << " | improveMrReallocation improved mksp from " << S.mksp << " to " << bestS.mksp 
+				<< " : task " << bestMove[0]
+				<< " swap out R" << bestMove[1]
+				<< " in R" << bestMove[2] << "\n";
+
 			S = std::move(bestS);
 			improved = true;
-			std::cout << "  Best-MR reassign: task " << bestMove[0]
-				<< " swap out R" << bestMove[1]
-				<< " in R" << bestMove[2]
-				<< " | mksp=" << S.mksp << "\n";
+			
 		}
 
 		return improved;
@@ -1355,9 +1370,10 @@ namespace mrta {
 		}
 
 		if (bestMksp + 1e-9 < S.mksp) {
+			std::cout << "mksp = " << bestS.mksp << " | improveVirtualGapInsertion improved mksp from: " << S.mksp << " to " << bestS.mksp << "\n";
 			S = std::move(bestS);
 			improved = true;
-			std::cout << "  Virtual-gap insertion improved: mksp=" << S.mksp << "\n";
+			
 		}
 
 		return improved;
@@ -1491,24 +1507,27 @@ namespace mrta {
 			}
 		}
 
-		if (bestDelta > 1e-3) {
+		if (bestDelta > 0) {
 			const std::string acceptedKey = hashStateOrders(bestS);
 			seenAcceptedStateHashes_.insert(acceptedKey);
 			seenEvaluatedStateHashes_.insert(acceptedKey);
 
-			S = std::move(bestS);
-			improved = true;
-			skipCheckpointedOrderAfterBatch_ = true;
-			rememberAcceptedBatchMove(bestAnchor, bestBatch, bestPerm);
-
-			std::cout << "  Coupled-MR-batch improved: anchor R" << bestAnchor << " | batch ["; for (size_t i = 0; i < bestBatch.size(); ++i) {
+			std::cout << "mksp = " << bestS.mksp << " | improveCoupledMrBatchOrder improved mksp from: " << S.mksp << " to " << bestS.mksp << " : ";
+			std::cout << " anchor R" << bestAnchor << " | batch ["; for (size_t i = 0; i < bestBatch.size(); ++i) {
 				std::cout << bestBatch[i] << (i + 1 < bestBatch.size() ? " " : "");
 			}
 			std::cout << "] -> [";
 			for (size_t i = 0; i < bestPerm.size(); ++i) {
 				std::cout << bestPerm[i] << (i + 1 < bestPerm.size() ? " " : "");
 			}
-			std::cout << "] | mksp=" << S.mksp << "\n";
+			std::cout << std::endl;
+
+			S = std::move(bestS);
+			improved = true;
+			skipCheckpointedOrderAfterBatch_ = true;
+			rememberAcceptedBatchMove(bestAnchor, bestBatch, bestPerm);
+
+			
 		}
 
 
@@ -1641,17 +1660,18 @@ namespace mrta {
 			}
 		}
 
-		if (bestDelta > 1e-9) {
-			S = bestS;
-			improved = true;
-
-			std::cout << "  Coupled-MR-order improved: "
-				<< bestBatchTasks.size()
+		if (bestDelta > 0) {
+			std::cout << "mksp = " << bestS.mksp << " | improveCoupledMrOrder improved mksp from: " << S.mksp << " to " << bestS.mksp << " : ";
+			std::cout <<  bestBatchTasks.size()
 				<< " checkpointed batched MR moves | tasks=";
 			for (int j : bestBatchTasks) {
 				std::cout << j << " ";
 			}
-			std::cout << "| mksp=" << S.mksp << "\n";
+			std::cout << std::endl;
+			S = bestS;
+			improved = true;
+
+			
 		}
 
 		return improved;
@@ -1982,12 +2002,13 @@ namespace mrta {
 			}
 		}
 
+#if VERBOSE
 		std::cout << "  RR2: critical robots = [";
 		for (size_t i = 0; i < critRobots.size(); ++i) {
 			std::cout << critRobots[i] << (i + 1 < critRobots.size() ? " " : "");
 		}
 		std::cout << "] | mksp = " << mkspCurr << "\n";
-
+#endif
 		double bestDelta = 0.0;
 		LocalSearchState bestS = S;
 		std::vector<VecInt> bestMrSwaps;
@@ -2175,10 +2196,11 @@ namespace mrta {
 				const std::string comboKey =
 					makeRr2ComboKey(z_mr, disruptedRobots, srToStrip, combo);
 
+#if VERBOSE
 				if (exhaustedRr2Combos_.find(comboKey) != exhaustedRr2Combos_.end()) {
 					++totalSkip;
 					++totalComboExhausted;
-					//	std::cout << "      RR2 combo skipped: exhausted\n";
+					std::cout << "      RR2 combo skipped: exhausted\n";
 					continue;
 				}
 
@@ -2195,9 +2217,10 @@ namespace mrta {
 					}
 					std::cout << "]\n";
 				}
+#endif
 
 				MatrixDouble z_stripped = z_mr;
-				auto ordP_stripped = S.ordP;
+				auto ordP_stripped_init = S.ordP;
 				auto ordV_stripped = S.ordV;
 
 				for (int j : srToStrip) {
@@ -2205,186 +2228,214 @@ namespace mrta {
 						z_stripped[s][j] = 0.0;
 					}
 					for (int s = 0; s < m(); ++s) {
-						removeTaskFromSequence(ordP_stripped[s], j);
+						removeTaskFromSequence(ordP_stripped_init[s], j);
 						removeTaskFromSequence(ordV_stripped[s], j);
 					}
 				}
 
-				for (const auto& sw : combo) {
-					const int j_mr = sw[0];
-					const int oldR = sw[1];
-					const int newR = sw[2];
-					removeTaskFromSequence(ordP_stripped[oldR], j_mr);
-					if (!containsTask(ordP_stripped[newR], j_mr)) {
-						ordP_stripped[newR].push_back(j_mr);
+				// Build front and back insertion variants for single-swap combos.
+			// The variant ordP is passed as frozen warm-start to screening so
+			// that the MR task position actually affects the repaired schedule.
+				std::vector<std::vector<VecInt>> ordP_stripped_variants;
+				{
+					auto ordP_base2 = ordP_stripped_init;
+					for (const auto& sw : combo) {
+						const int j_mr = sw[0];
+						const int oldR = sw[1];
+						removeTaskFromSequence(ordP_base2[oldR], j_mr);
 					}
-				}
 
-				VecInt srPhysStripped;
-				VecInt srVirtStripped;
-				for (int j : srToStrip) {
-					if (taskIsVirtual(j)) srVirtStripped.push_back(j);
-					else srPhysStripped.push_back(j);
-				}
-
-				std::vector<VecInt> capLists(srPhysStripped.size());
-				for (int ii = 0; ii < static_cast<int>(srPhysStripped.size()); ++ii) {
-					const int j = srPhysStripped[ii];
-					for (int r = 0; r < m(); ++r) {
-						if (inst_.cap[r][j] > 0.5) {
-							capLists[ii].push_back(r);
-						}
-					}
-				}
-
-				std::vector<VecInt> virtCapLists(srVirtStripped.size());
-				for (int ii = 0; ii < static_cast<int>(srVirtStripped.size()); ++ii) {
-					const int j = srVirtStripped[ii];
-					for (int r = 0; r < m(); ++r) {
-						if (inst_.cap[r][j] > 0.5) {
-							virtCapLists[ii].push_back(r);
-						}
-					}
-				}
-
-				long long totalFeasible = 1;
-				for (const auto& caps : capLists) {
-					totalFeasible *= static_cast<long long>(caps.size());
-					if (totalFeasible > opt_.RR2_EXHAUST_LIMIT) {
-						break;
-					}
-				}
-
-				if (totalFeasible <= opt_.RR2_EXHAUST_LIMIT) {
-					const auto assignments = enumerateAllAssignments(capLists);
-					const int nAssign = static_cast<int>(assignments.size());
-
-					std::vector<double> cheapMksp(nAssign, std::numeric_limits<double>::infinity());
-					std::vector<std::string> zHashes(nAssign);
-					int nScreened = 0;
-					int nCheapHit = 0;
-
-					for (int aa = 0; aa < nAssign; ++aa) {
-						MatrixDouble z_try = z_stripped;
-						for (int ii = 0; ii < static_cast<int>(srPhysStripped.size()); ++ii) {
-							z_try[assignments[aa][ii]][srPhysStripped[ii]] = 1.0;
-						}
-						z_try = assignVirtuals(z_try, srVirtStripped, virtCapLists);
-
-						const std::string zHash = hashAssignment(z_try);
-						zHashes[aa] = zHash;
-
-						const auto it = evalCache.find(zHash);
-						if (it != evalCache.end()) {
-							cheapMksp[aa] = it->second;
-							++nCheapHit;
+					if (combo.size() == 1) {
+						const int j_mr = combo[0][0];
+						const int newR = combo[0][2];
+						if (!containsTask(ordP_base2[newR], j_mr)) {
+							// Front insertion variant
+							{
+								auto v = ordP_base2;
+								v[newR].insert(v[newR].begin(), j_mr);
+								ordP_stripped_variants.push_back(std::move(v));
+							}
+							// Back insertion variant
+							{
+								auto v = ordP_base2;
+								v[newR].push_back(j_mr);
+								ordP_stripped_variants.push_back(std::move(v));
+							}
 						}
 						else {
-							LocalSearchState St;
-							if (evaluateState(S, z_try, nullptr, nullptr, false, opt_.nRepairReloc, St)) {
-								cheapMksp[aa] = St.mksp;
+							// Task already present — use ordP_base2 as-is
+							ordP_stripped_variants.push_back(ordP_base2);
+						}
+					}
+					else {
+						// Multi-swap: back only
+						auto v = ordP_base2;
+						for (const auto& sw : combo) {
+							const int j_mr = sw[0];
+							const int newR = sw[2];
+							if (!containsTask(v[newR], j_mr))
+								v[newR].push_back(j_mr);
+						}
+						ordP_stripped_variants.push_back(std::move(v));
+					}
+				}
+
+				for (auto& ordP_stripped : ordP_stripped_variants) {
+
+				// Run the full evaluation for each candidate ordP_stripped.
+				// Accept the best result across all insertion positions.
+				
+
+					VecInt srPhysStripped;
+					VecInt srVirtStripped;
+					for (int j : srToStrip) {
+						if (taskIsVirtual(j)) srVirtStripped.push_back(j);
+						else srPhysStripped.push_back(j);
+					}
+
+					std::vector<VecInt> capLists(srPhysStripped.size());
+					for (int ii = 0; ii < static_cast<int>(srPhysStripped.size()); ++ii) {
+						const int j = srPhysStripped[ii];
+						for (int r = 0; r < m(); ++r) {
+							if (inst_.cap[r][j] > 0.5) {
+								capLists[ii].push_back(r);
 							}
-							++nScreened;
 						}
 					}
 
-					std::cout << "      Exhaustive: " << nAssign
-						<< " assignments for " << srPhysStripped.size()
-						<< " tasks (new=" << nScreened
-						<< ", cached=" << nCheapHit << ")\n";
-
-					// If this neighborhood is mostly cached already, do not spend more effort here.
-					if (nScreened <= 2 && nCheapHit >= nAssign - 2) {
-						exhaustedRr2Combos_.insert(comboKey);
-						std::cout << "      RR2 combo marked exhausted (cache-dominated)\n";
-						continue;
+					std::vector<VecInt> virtCapLists(srVirtStripped.size());
+					for (int ii = 0; ii < static_cast<int>(srVirtStripped.size()); ++ii) {
+						const int j = srVirtStripped[ii];
+						for (int r = 0; r < m(); ++r) {
+							if (inst_.cap[r][j] > 0.5) {
+								virtCapLists[ii].push_back(r);
+							}
+						}
 					}
 
-
-					if (nScreened == 0) {
-						exhaustedRr2Combos_.insert(comboKey);
-						std::cout << "      RR2 combo marked exhausted\n";
-						continue;
-					}
-
-					std::vector<int> sortIdx(nAssign);
-					std::iota(sortIdx.begin(), sortIdx.end(), 0);
-					std::sort(sortIdx.begin(), sortIdx.end(), [&](int a, int b) {
-						return cheapMksp[a] < cheapMksp[b];
-						});
-
-					int nDeepDone = 0;
-					for (int kk = 0; kk < nAssign; ++kk) {
-						if (nDeepDone >= opt_.RR2_EXHAUST_TOP_K) {
+					long long totalFeasible = 1;
+					for (const auto& caps : capLists) {
+						totalFeasible *= static_cast<long long>(caps.size());
+						if (totalFeasible > opt_.RR2_EXHAUST_LIMIT) {
 							break;
 						}
-
-						const int aa = sortIdx[kk];
-						const std::string& zHash = zHashes[aa];
-
-						if (evalCache.find(zHash) != evalCache.end()) {
-							++totalSkip;
-							continue;
-						}
-
-						MatrixDouble z_try = z_stripped;
-						for (int ii = 0; ii < static_cast<int>(srPhysStripped.size()); ++ii) {
-							z_try[assignments[aa][ii]][srPhysStripped[ii]] = 1.0;
-						}
-						z_try = assignVirtuals(z_try, srVirtStripped, virtCapLists);
-
-						LocalSearchState Squick;
-						if (!evaluateState(S, z_try, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
-							continue;
-						}
-
-						// Skip obviously bad candidates before deep/thorough evaluation.
-						if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
-							++totalSkip;
-							evalCache[zHash] = Squick.mksp;  // optional: cache cheap result
-							continue;
-						}
-
-						++nDeepDone;
-						const auto evalRes = (nDeepDone == 1) ? thoroughEval(z_try, S) : deepEval(z_try, S);
-
-						++totalDeep;
-						evalCache[zHash] = evalRes.second;
-
-						const double delta = S.mksp - evalRes.second;
-						if (delta > bestDelta + 1e-9) {
-							bestDelta = delta;
-							bestS = evalRes.first;
-							bestSrTasks = srToStrip;
-							bestMrSwaps = combo;
-
-							std::cout << "  RR2: no improvement found ("
-								<< opt_.RR2_NUM_TRIALS << " trials, "
-								<< totalDeep << " deep evals, "
-								<< totalSkip << " skipped, "
-								<< totalComboExhausted << " combo-exhausted)\n";
-						}
 					}
-				}
-				else {
-					bool anyNewEval = false;
 
-					MatrixDouble z_greedy = buildGreedyAssignment(
-						z_stripped, srPhysStripped, srVirtStripped, capLists, virtCapLists);
+					if (totalFeasible <= opt_.RR2_EXHAUST_LIMIT) {
+						const auto assignments = enumerateAllAssignments(capLists);
+						const int nAssign = static_cast<int>(assignments.size());
 
-					std::string zHash = hashAssignment(z_greedy);
-					if (evalCache.find(zHash) == evalCache.end()) {
-						anyNewEval = true;
-						LocalSearchState Squick;
-						if (!evaluateState(S, z_greedy, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
-							++totalSkip;
+						std::vector<double> cheapMksp(nAssign, std::numeric_limits<double>::infinity());
+						std::vector<std::string> zHashes(nAssign);
+						int nScreened = 0;
+						int nCheapHit = 0;
+
+						for (int aa = 0; aa < nAssign; ++aa) {
+							MatrixDouble z_try = z_stripped;
+							for (int ii = 0; ii < static_cast<int>(srPhysStripped.size()); ++ii) {
+								z_try[assignments[aa][ii]][srPhysStripped[ii]] = 1.0;
+							}
+							z_try = assignVirtuals(z_try, srVirtStripped, virtCapLists);
+
+							const std::string zHash = hashAssignment(z_try);
+							zHashes[aa] = zHash;
+
+							const auto it = evalCache.find(zHash);
+							if (it != evalCache.end()) {
+								cheapMksp[aa] = it->second;
+								++nCheapHit;
+							}
+							else {
+								LocalSearchState St;
+								if (evaluateState(S, z_try, nullptr, nullptr, false, opt_.nRepairReloc, St)) {
+									cheapMksp[aa] = St.mksp;
+								}
+								++nScreened;
+							}
 						}
-						else if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
-							++totalSkip;
-							evalCache[zHash] = Squick.mksp;
+
+						//std::cout << "      Exhaustive: " << nAssign
+						//	<< " assignments for " << srPhysStripped.size()
+						//	<< " tasks (new=" << nScreened
+						//	<< ", cached=" << nCheapHit << ")\n";
+
+						// If this neighborhood is mostly cached already, do not spend more effort here.
+
+						if (nScreened <= 2 && nCheapHit >= nAssign - 2) {
+							exhaustedRr2Combos_.insert(comboKey);
+#if VERBOSE
+							std::cout << "      RR2 combo marked exhausted (cache-dominated)\n";
+#endif
+							continue;
 						}
-						else {
-							const auto evalRes = deepEval(z_greedy, S);
+
+
+						if (nScreened == 0) {
+							exhaustedRr2Combos_.insert(comboKey);
+#if VERBOSE
+							std::cout << "      RR2 combo marked exhausted\n";
+#endif
+							continue;
+						}
+
+						std::vector<int> sortIdx(nAssign);
+						std::iota(sortIdx.begin(), sortIdx.end(), 0);
+						std::sort(sortIdx.begin(), sortIdx.end(), [&](int a, int b) {
+							return cheapMksp[a] < cheapMksp[b];
+							});
+
+						int nDeepDone = 0;
+						for (int kk = 0; kk < nAssign; ++kk) {
+							if (nDeepDone >= opt_.RR2_EXHAUST_TOP_K) {
+								break;
+							}
+
+							const int aa = sortIdx[kk];
+							const std::string& zHash = zHashes[aa];
+
+							if (evalCache.find(zHash) != evalCache.end()) {
+								++totalSkip;
+								continue;
+							}
+
+							MatrixDouble z_try = z_stripped;
+							for (int ii = 0; ii < static_cast<int>(srPhysStripped.size()); ++ii) {
+								z_try[assignments[aa][ii]][srPhysStripped[ii]] = 1.0;
+							}
+							z_try = assignVirtuals(z_try, srVirtStripped, virtCapLists);
+
+							// Build ordP hint with SR tasks appended to their assigned robots.
+							auto ordP_hint = ordP_stripped;
+							for (int ii = 0; ii < static_cast<int>(srPhysStripped.size()); ++ii) {
+								const int j = srPhysStripped[ii];
+								const int r = assignments[aa][ii];
+								if (!containsTask(ordP_hint[r], j))
+									ordP_hint[r].push_back(j);
+							}
+							auto ordV_hint = ordV_stripped;
+							for (int ii = 0; ii < static_cast<int>(srVirtStripped.size()); ++ii) {
+								const int j = srVirtStripped[ii];
+								for (int r = 0; r < m(); ++r) {
+									if (z_try[r][j] > 0.5 && !containsTask(ordV_hint[r], j))
+										ordV_hint[r].push_back(j);
+								}
+							}
+
+							LocalSearchState Squick;
+							if (!evaluateState(S, z_try, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
+								continue;
+							}
+
+							// Skip obviously bad candidates before deep/thorough evaluation.
+							if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
+								++totalSkip;
+								evalCache[zHash] = Squick.mksp;  // optional: cache cheap result
+								continue;
+							}
+
+							++nDeepDone;
+							
+							const auto evalRes = (nDeepDone == 1) ? thoroughEval(z_try, S) : deepEval(z_try, S);
 							++totalDeep;
 							evalCache[zHash] = evalRes.second;
 
@@ -2395,69 +2446,108 @@ namespace mrta {
 								bestSrTasks = srToStrip;
 								bestMrSwaps = combo;
 
-								std::cout << "    RR2 greedy: delta=" << delta
-									<< " mksp=" << evalRes.second
-									<< " | MR swaps=" << combo.size() << "\n";
+#if VERBOSE
+								std::cout << "  RR2: no improvement found ("
+									<< opt_.RR2_NUM_TRIALS << " trials, "
+									<< totalDeep << " deep evals, "
+									<< totalSkip << " skipped, "
+									<< totalComboExhausted << " combo-exhausted)\n";
+#endif
+							}
+						}
+					}
+					else {
+						bool anyNewEval = false;
+
+						MatrixDouble z_greedy = buildGreedyAssignment(
+							z_stripped, srPhysStripped, srVirtStripped, capLists, virtCapLists);
+
+						std::string zHash = hashAssignment(z_greedy);
+						if (evalCache.find(zHash) == evalCache.end()) {
+							anyNewEval = true;
+							LocalSearchState Squick;
+							if (!evaluateState(S, z_greedy, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
+								++totalSkip;
+							}
+							else if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
+								++totalSkip;
+								evalCache[zHash] = Squick.mksp;
+							}
+							else {
+								const auto evalRes = deepEval(z_greedy, S); 
+								++totalDeep;
+								evalCache[zHash] = evalRes.second;
+
+								const double delta = S.mksp - evalRes.second;
+								if (delta > bestDelta + 1e-9) {
+									bestDelta = delta;
+									bestS = evalRes.first;
+									bestSrTasks = srToStrip;
+									bestMrSwaps = combo;
+
+									std::cout << "    RR2 greedy: delta=" << delta
+										<< " mksp=" << evalRes.second
+										<< " | MR swaps=" << combo.size() << "\n";
+								}
+							}
+
+						}
+						else {
+							++totalSkip;
+						}
+
+						for (int pp = 0; pp < opt_.RR2_NUM_PERTURBATIONS; ++pp) {
+							MatrixDouble z_pert = perturbAssignment(z_greedy, srPhysStripped, capLists);
+							z_pert = assignVirtuals(z_pert, srVirtStripped, virtCapLists);
+
+							zHash = hashAssignment(z_pert);
+							if (evalCache.find(zHash) != evalCache.end()) {
+								++totalSkip;
+								continue;
+							}
+
+							anyNewEval = true;
+							LocalSearchState Squick;
+							if (!evaluateState(S, z_pert, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
+								++totalSkip;
+								continue;
+							}
+
+							if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
+								++totalSkip;
+								evalCache[zHash] = Squick.mksp;
+								continue;
+							}
+
+							const auto evalRes = deepEval(z_pert, S); 
+							++totalDeep;
+							evalCache[zHash] = evalRes.second;
+
+							const double delta = S.mksp - evalRes.second;
+							if (delta > bestDelta + 1e-9) {
+								bestDelta = delta;
+								bestS = evalRes.first;
+								bestSrTasks = srToStrip;
+								bestMrSwaps = combo;
+
+								std::cout << "    RR2 perturb[" << pp + 1
+									<< "]: delta=" << delta
+									<< " mksp=" << evalRes.second << "\n";
 							}
 						}
 
-					}
-					else {
-						++totalSkip;
-					}
-
-					for (int pp = 0; pp < opt_.RR2_NUM_PERTURBATIONS; ++pp) {
-						MatrixDouble z_pert = perturbAssignment(z_greedy, srPhysStripped, capLists);
-						z_pert = assignVirtuals(z_pert, srVirtStripped, virtCapLists);
-
-						zHash = hashAssignment(z_pert);
-						if (evalCache.find(zHash) != evalCache.end()) {
-							++totalSkip;
-							continue;
+						if (!anyNewEval) {
+							exhaustedRr2Combos_.insert(comboKey);
 						}
-
-						anyNewEval = true;
-						LocalSearchState Squick;
-						if (!evaluateState(S, z_pert, nullptr, nullptr, false, opt_.nRepairReloc, Squick)) {
-							++totalSkip;
-							continue;
-						}
-
-						if (Squick.mksp > S.mksp + opt_.RR2_EVAL_MAX_DEGRADATION) {
-							++totalSkip;
-							evalCache[zHash] = Squick.mksp;
-							continue;
-						}
-
-						const auto evalRes = deepEval(z_pert, S);
-						++totalDeep;
-						evalCache[zHash] = evalRes.second;
-
-						const double delta = S.mksp - evalRes.second;
-						if (delta > bestDelta + 1e-9) {
-							bestDelta = delta;
-							bestS = evalRes.first;
-							bestSrTasks = srToStrip;
-							bestMrSwaps = combo;
-
-							std::cout << "    RR2 perturb[" << pp + 1
-								<< "]: delta=" << delta
-								<< " mksp=" << evalRes.second << "\n";
-						}
-					}
-
-					if (!anyNewEval) {
-						exhaustedRr2Combos_.insert(comboKey);
 					}
 				}
 			}
 		}
 
-		if (bestDelta > 1e-9) {
-			S = bestS;
-			improved = true;
+		if (bestDelta > 0) {
 
-			std::cout << "  RR2 improved: ";
+			std::cout << "mksp = " << bestS.mksp << " | improveRuinRecreate improved mksp from: " << S.mksp << " to " << bestS.mksp << " : ";
+
 			if (bestMrSwaps.empty()) {
 				std::cout << "pure-SR";
 			}
@@ -2475,14 +2565,19 @@ namespace mrta {
 			for (size_t i = 0; i < bestSrTasks.size(); ++i) {
 				std::cout << bestSrTasks[i] << (i + 1 < bestSrTasks.size() ? " " : "");
 			}
-			std::cout << "] | delta=" << bestDelta
-				<< " | mksp=" << S.mksp << "\n";
+			std::cout << std::endl;
+			S = std::move(bestS);
+			improved = true;
+
+			
 		}
 		else {
+#if VERBOSE
 			std::cout << "  RR2: no improvement found ("
 				<< opt_.RR2_NUM_TRIALS << " trials, "
 				<< totalDeep << " deep evals, "
 				<< totalSkip << " skipped)\n";
+#endif
 		}
 
 		return improved;
@@ -2854,7 +2949,9 @@ namespace mrta {
 
 	std::pair<LocalSearchState, double> LocalSearch::deepEval(
 		const MatrixDouble& zTry,
-		const LocalSearchState& SBase) const
+		const LocalSearchState& SBase,
+		const std::vector<VecInt>* ordPHint,
+		const std::vector<VecInt>* ordVHint) const
 	{
 		LocalSearchState Sout;
 		LocalSearch& self = const_cast<LocalSearch&>(*this);
@@ -2863,7 +2960,8 @@ namespace mrta {
 			return { SBase, std::numeric_limits<double>::infinity() };
 		}
 
-		// Snapshot outer-search caches so RR2 local polishing does not pollute them.
+
+
 		auto savedSeenAcceptedStateHashes = self.seenAcceptedStateHashes_;
 		auto savedSeenEvaluatedStateHashes = self.seenEvaluatedStateHashes_;
 		auto savedSeenBatchNeighborhoods = self.seenBatchNeighborhoods_;
@@ -2881,17 +2979,11 @@ namespace mrta {
 		Pmr.MR_MOVE_MAX_POS_TRIALS = 1;
 		Pmr.MR_MOVE_BATCH_SIZE = 1;
 
-		// Only do MR polishing if the candidate is not already much worse than the base.
 		if (Sout.mksp <= SBase.mksp + opt_.RR2_POLISH_MAX_DEGRADATION) {
 			self.improveCoupledMrBatchOrder(Sout, Pmr);
 			self.improveCoupledMrOrder(Sout, Pmr);
 		}
-		/*	else {
-				std::cout << "      deepEval: skipped MR polish (mksp="
-					<< Sout.mksp << ", base=" << SBase.mksp
-					<< ", max degradation=" << opt_.RR2_POLISH_MAX_DEGRADATION << ")\n";
-			}*/
-			// Restore outer-search caches.
+
 		self.seenAcceptedStateHashes_ = std::move(savedSeenAcceptedStateHashes);
 		self.seenEvaluatedStateHashes_ = std::move(savedSeenEvaluatedStateHashes);
 		self.seenBatchNeighborhoods_ = std::move(savedSeenBatchNeighborhoods);
@@ -2904,7 +2996,9 @@ namespace mrta {
 
 	std::pair<LocalSearchState, double> LocalSearch::thoroughEval(
 		const MatrixDouble& zTry,
-		const LocalSearchState& SBase) const
+		const LocalSearchState& SBase,
+		const std::vector<VecInt>* ordPHint,
+		const std::vector<VecInt>* ordVHint) const
 	{
 		LocalSearchState Sout;
 		LocalSearch& self = const_cast<LocalSearch&>(*this);
@@ -2913,7 +3007,6 @@ namespace mrta {
 			return { SBase, std::numeric_limits<double>::infinity() };
 		}
 
-		// Snapshot outer-search caches so RR2 local polishing does not pollute them.
 		auto savedSeenAcceptedStateHashes = self.seenAcceptedStateHashes_;
 		auto savedSeenEvaluatedStateHashes = self.seenEvaluatedStateHashes_;
 		auto savedSeenBatchNeighborhoods = self.seenBatchNeighborhoods_;
@@ -2937,7 +3030,6 @@ namespace mrta {
 			self.improveIntraOrder(Sout, 15);
 		}
 
-		// Restore outer-search caches.
 		self.seenAcceptedStateHashes_ = std::move(savedSeenAcceptedStateHashes);
 		self.seenEvaluatedStateHashes_ = std::move(savedSeenEvaluatedStateHashes);
 		self.seenBatchNeighborhoods_ = std::move(savedSeenBatchNeighborhoods);

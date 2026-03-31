@@ -23,6 +23,7 @@
 
 // To test ADMM contribution: set to 1 for random, 0 for real ADMM
 #define USE_RANDOM_ADMM 0
+#define VERBOSE 0
 
 void printVector(const std::string& label, const mrta::VecDouble& v);
 void printVectorInt1Based(const std::string& label, const mrta::VecInt& v);
