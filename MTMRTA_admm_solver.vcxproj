@@ -146,11 +146,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommonTypes.h" />
-    <ClInclude Include="SolverParameters.h" />
     <ClInclude Include="src\app\DistributedMrtaApp.h" />
     <ClInclude Include="src\domain\DerivedData.h" />
     <ClInclude Include="src\domain\InstanceData.h" />
     <ClInclude Include="src\domain\SolutionState.h" />
+    <ClInclude Include="src\domain\SolverParameters.h" />
     <ClInclude Include="src\domain\UserConfig.h" />
     <ClInclude Include="src\io\InstanceLoader.h" />
     <ClInclude Include="src\solver\AdmmSolver.h" />

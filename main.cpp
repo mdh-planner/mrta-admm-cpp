@@ -18,6 +18,8 @@
 #include <fstream>
 #include <sstream>
 #include <random>
+#include <cmath>
+
 
 // To test ADMM contribution: set to 1 for random, 0 for real ADMM
 #define USE_RANDOM_ADMM 0
@@ -51,6 +53,10 @@ std::string matlabRowVector(const mrta::VecDouble& v);
 std::string matlabRowVectorInt1Based(const mrta::VecInt& v);
 std::string matlabMatrix(const mrta::MatrixDouble& M);
 std::string matlabCellOrders1Based(const std::vector<mrta::VecInt>& orders);
+static void printScheduleLikeCp(
+	const mrta::InstanceData& inst,
+	const mrta::LocalSearchOutput& out,
+	double solveSeconds);
 
 int main() {
 
@@ -93,7 +99,7 @@ int main() {
 		// Optimal = [1-14,16,30
 		// Sub-Optimal = [15,17-29
 		mrta::UserConfig config;
-		config.instId = 20;
+		config.instId = 17;
 		config.cpEnabled = false;
 		config.useFixedEndDepot = false;
 
@@ -224,6 +230,9 @@ int main() {
 		lsOpts.RR2_EXHAUST_TOP_K = LSP.rr2ExhaustTopK;
 		lsOpts.POLISH_N_INNER = LSP.rr2PolishNInner;
 		lsOpts.timeLimitSeconds = 200.0;  // or whatever limit you want
+		lsOpts.RR2_EVAL_MAX_DEGRADATION = LSP.rr2EvalMaxDegradation;
+		lsOpts.RR2_POLISH_MAX_DEGRADATION = LSP.rr2PolishMaxDegradation;
+		lsOpts.RR2_CACHE_DOMINATED_MAX_NEW = LSP.rr2CacheDominatedMaxNew;
 
 		mrta::LocalSearch localSearch(instance, lsOpts, repairer, scorer);
 
@@ -310,6 +319,8 @@ int main() {
 			}
 			std::cout << cnt << (s + 1 < instance.m ? ' ' : '\n');
 		}
+
+		printScheduleLikeCp(instance, lsOut, /*solveSeconds=*/ elapsed_sec);
 
 		std::cout << "\nDone.\n";
 		return 0;
@@ -494,4 +505,92 @@ std::string matlabBoolRowVector(const mrta::BoolVec& v) {
 	}
 	oss << "]";
 	return oss.str();
+}
+
+
+static void printScheduleLikeCp(
+	const mrta::InstanceData& inst,
+	const mrta::LocalSearchOutput& out,
+	double solveSeconds)
+{
+	std::cout << "Makespan        : " << static_cast<int>(std::round(out.mksp_best)) << "\n";
+	std::cout << "Time spent in solve: " << solveSeconds << " seconds.\n";
+
+	struct TaskRow {
+		int taskId;     // 0-based
+		int robot;      // 0-based
+		double start;
+		double end;
+		
+	};
+
+	std::vector<TaskRow> rows;
+
+
+	auto currentTaskDuration = [&](int s, int j) -> double {
+		if (inst.isMR[j]) {
+			double best = 0.0;
+			bool found = false;
+			for (int r = 0; r < inst.m; ++r) {
+				const double v = inst.svcPhysSJ[r][j];
+				if (std::isfinite(v) && v >= 0.0) {
+					best = found ? std::max(best, v) : v;
+					found = true;
+				}
+			}
+			return found ? best : 0.0;
+		}
+
+		const double raw = inst.isVirtual[j] ? inst.svcVirtSJ[s][j] : inst.svcPhysSJ[s][j];
+		return (std::isfinite(raw) && raw >= 0.0) ? raw : 0.0;
+		};
+
+	auto thetaTaskStart = [&](int j) -> double {
+		if (j < 0 || j >= static_cast<int>(out.theta_best.size())) {
+			return 0.0;
+		}
+		return std::isfinite(out.theta_best[j]) ? out.theta_best[j] : 0.0;
+		};
+
+	// Physical tasks
+	for (int r = 0; r < inst.m; ++r) {
+		for (int j : out.orders_phys_best[r]) {
+			double st = inst.isMR[j] ? thetaTaskStart(j) : out.tau_best[r][j];
+			double en = st + currentTaskDuration(r, j);
+
+		
+			rows.push_back({ j, r, st, en });
+		}
+	}
+
+	// Virtual tasks
+	for (int r = 0; r < inst.m; ++r) {
+		for (int j : out.orders_virt_best[r]) {
+			double st = out.tau_best[r][j];
+			double en = st + currentTaskDuration(r, j);
+
+			
+			rows.push_back({ j, r, st, en});
+		}
+	}
+
+	std::sort(rows.begin(), rows.end(),
+		[](const TaskRow& a, const TaskRow& b) {
+			if (a.taskId != b.taskId) return a.taskId < b.taskId;   // Task 0,1,2,...
+			if (a.robot != b.robot) return a.robot < b.robot;       // then by robot
+			if (std::abs(a.start - b.start) > 1e-9) return a.start < b.start;
+			return a.end < b.end;
+		});
+
+	for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
+		const auto& row = rows[i];
+		std::cout
+			<< "Task " << row.taskId
+			<< " on robot " << row.robot
+			<< ": start time: " << static_cast<int>(std::round(row.start))
+			<< " | end time: " << static_cast<int>(std::round(row.end))
+			<< "\n";
+	}
+
+	std::cout << "\n";
 }

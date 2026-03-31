@@ -17,7 +17,7 @@ namespace mrta {
 	struct LocalSearchOptions {
 		int nOuter{ 10 };
 		int nInnerOrder{ 10 };
-		double minRelImprovementPct{ 1.0 };
+		double minRelImprovementPct{ 0.1 };
 
 		int nRepairInit{ 3 };
 		int nRepairFrozen{ 3 };
@@ -61,9 +61,20 @@ namespace mrta {
 		bool RR2_ALSO_PURE_SR{ true };
 		bool RR2_ALSO_VIRT{ true };
 		int RR2_POLISH_N_INNER{ 15 };
-		double RR2_POLISH_MAX_DEGRADATION = 25.0;
+		double RR2_CACHE_DOMINATED_MAX_NEW = 2;
 		double RR2_EVAL_MAX_DEGRADATION = 100.0;
+		double RR2_POLISH_MAX_DEGRADATION = RR2_EVAL_MAX_DEGRADATION * 0.5;
+
 		double timeLimitSeconds{ std::numeric_limits<double>::infinity() };
+		// Preset overrides for inline option structs
+		int  polishMrBatchTrials{ 8 };
+		bool polishMrBatchCriticalOnly{ true };
+		int  polishMrMoveBatchTrials{ 3 };
+		int  polishMrMoveMaxPos{ 2 };
+
+		int  relocateMrBatchTrials{ 5 };
+		int  relocateMrMoveBatchTrials{ 3 };
+		int  relocateMrMoveMaxPos{ 2 };
 	};
 
 	struct LocalSearchState {

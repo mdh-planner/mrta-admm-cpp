@@ -77,9 +77,6 @@
     <ClInclude Include="CommonTypes.h">
       <Filter>Header Files\domain</Filter>
     </ClInclude>
-    <ClInclude Include="SolverParameters.h">
-      <Filter>Header Files\domain</Filter>
-    </ClInclude>
     <ClInclude Include="src\domain\UserConfig.h">
       <Filter>Header Files\domain</Filter>
     </ClInclude>
@@ -111,6 +108,9 @@
       <Filter>Header Files\solver</Filter>
     </ClInclude>
     <ClInclude Include="src\domain\InstanceData.h">
+      <Filter>Header Files\domain</Filter>
+    </ClInclude>
+    <ClInclude Include="src\domain\SolverParameters.h">
       <Filter>Header Files\domain</Filter>
     </ClInclude>
   </ItemGroup>

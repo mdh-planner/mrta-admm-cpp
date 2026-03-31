@@ -227,11 +227,11 @@ namespace mrta {
 			improved = improveGapWindow(S) || improved;
 			improved = improveGapFill(S) || improved;
 
-			did = improveSrAssignment(S);
+			/*did = improveSrAssignment(S);
 			if (did) {
 				improved = true;
 				S = polishAfterAssignment(S, opt_.POLISH_N_INNER);
-			}
+			}*/
 
 			did = improveMrReallocation(S);
 			if (did) {
@@ -441,10 +441,10 @@ namespace mrta {
 		improveIntraOrder(S, nInnerPolish);
 
 		LocalSearchOptions P_light = opt_;
-		P_light.MR_BATCH_N_TRIALS = std::min(8, opt_.MR_BATCH_N_TRIALS);
-		P_light.MR_BATCH_CRITICAL_ONLY = true;
-		P_light.MR_MOVE_NUM_BATCH_TRIALS = std::min(3, opt_.MR_MOVE_NUM_BATCH_TRIALS);
-		P_light.MR_MOVE_MAX_POS_TRIALS = std::min(2, opt_.MR_MOVE_MAX_POS_TRIALS);
+		P_light.MR_BATCH_N_TRIALS = opt_.polishMrBatchTrials;
+		P_light.MR_BATCH_CRITICAL_ONLY = opt_.polishMrBatchCriticalOnly;
+		P_light.MR_MOVE_NUM_BATCH_TRIALS = opt_.polishMrMoveBatchTrials;
+		P_light.MR_MOVE_MAX_POS_TRIALS = opt_.polishMrMoveMaxPos;
 
 		improveCoupledMrBatchOrder(S, P_light);
 		improveCoupledMrOrder(S, P_light);
@@ -989,10 +989,10 @@ namespace mrta {
 		LocalSearchState bestS = S;
 
 		LocalSearchOptions P_light = opt_;
-		P_light.MR_BATCH_N_TRIALS = 5;
-		P_light.MR_BATCH_CRITICAL_ONLY = false;
-		P_light.MR_MOVE_NUM_BATCH_TRIALS = 3;
-		P_light.MR_MOVE_MAX_POS_TRIALS = 2;
+		P_light.MR_BATCH_N_TRIALS = opt_.polishMrBatchTrials;
+		P_light.MR_BATCH_CRITICAL_ONLY = opt_.polishMrBatchCriticalOnly;
+		P_light.MR_MOVE_NUM_BATCH_TRIALS = opt_.polishMrMoveBatchTrials;
+		P_light.MR_MOVE_MAX_POS_TRIALS = opt_.polishMrMoveMaxPos;
 
 		const VecDouble arrivalTmp = robotArrivalToDepot(S);
 		const double mkspCurr = *std::max_element(arrivalTmp.begin(), arrivalTmp.end());
@@ -1201,6 +1201,13 @@ namespace mrta {
 	{
 		bool improved = false;
 
+
+		LocalSearchOptions P_light = opt_;
+		P_light.MR_BATCH_N_TRIALS = opt_.polishMrBatchTrials;
+		P_light.MR_BATCH_CRITICAL_ONLY = opt_.polishMrBatchCriticalOnly;
+		P_light.MR_MOVE_NUM_BATCH_TRIALS = opt_.polishMrMoveBatchTrials;
+		P_light.MR_MOVE_MAX_POS_TRIALS = opt_.polishMrMoveMaxPos;
+
 		VecInt mrTasks;
 		for (int j = 0; j < n(); ++j) {
 			if (taskIsMR(j)) {
@@ -1253,6 +1260,9 @@ namespace mrta {
 						continue;
 					}
 
+
+					improveCoupledMrBatchOrder(St, P_light);
+					improveCoupledMrOrder(St, P_light);
 					const double delta = S.mksp - St.mksp;
 					if (delta > bestDelta + 1e-9) {
 						bestDelta = delta;
@@ -1502,13 +1512,13 @@ namespace mrta {
 		}
 
 
-		if (skipSeenNeighborhood > 0 || skipInverseMove > 0 ||
+		/*if (skipSeenNeighborhood > 0 || skipInverseMove > 0 ||
 			skipSeenCandidateState > 0 || skipSeenEvaluatedState > 0) {
 			std::cout << "    MR-batch skips: neigh=" << skipSeenNeighborhood
 				<< " inverse=" << skipInverseMove
 				<< " candState=" << skipSeenCandidateState
 				<< " evalState=" << skipSeenEvaluatedState << "\n";
-		}
+		}*/
 
 		return improved;
 	}
@@ -1669,7 +1679,7 @@ namespace mrta {
 				remaining.push_back(r);
 			}
 		}
-
+		LocalSearchState Sseed_rolling = Sseed;
 		while (!remaining.empty()) {
 			int bestRobotIdx = -1;
 			VecInt bestRobotSeq;
@@ -1700,7 +1710,7 @@ namespace mrta {
 					ordP_eval[s] = seqTry;
 
 					LocalSearchState St;
-					if (!evaluateState(Sseed, Sseed.z, &ordP_eval, &ordV_ref, true, nRepairFrozen, St)) {
+					if (!evaluateState(Sseed_rolling, Sseed_rolling.z, &ordP_eval, &ordV_ref, true, nRepairFrozen, St)) {
 						continue;
 					}
 
@@ -1736,6 +1746,12 @@ namespace mrta {
 			const int sCommit = remaining[bestRobotIdx];
 			ordP_try[sCommit] = bestRobotSeq;
 			remaining.erase(remaining.begin() + bestRobotIdx);
+			{
+				LocalSearchState Stmp;
+				if (evaluateState(Sseed_rolling, Sseed_rolling.z, &ordP_try, &ordV_ref,
+					true, nRepairFrozen, Stmp))
+					Sseed_rolling = std::move(Stmp);
+			}
 		}
 
 		return true;
@@ -1752,7 +1768,7 @@ namespace mrta {
 		int nRepairFrozen)
 	{
 		VecInt remaining = Pset;
-
+		LocalSearchState Sseed_rolling = Sseed;
 		while (!remaining.empty()) {
 			int bestRobotIdx = -1;
 			VecInt bestRobotSeq;
@@ -1787,7 +1803,7 @@ namespace mrta {
 					ordP_eval[s] = seqTry;
 
 					LocalSearchState St;
-					if (!evaluateState(Sseed, Sseed.z, &ordP_eval, &ordV_ref, true, nRepairFrozen, St)) {
+					if (!evaluateState(Sseed_rolling, Sseed_rolling.z, &ordP_eval, &ordV_ref, true, nRepairFrozen, St)) {
 						continue;
 					}
 
@@ -1823,6 +1839,12 @@ namespace mrta {
 			const int sCommit = remaining[bestRobotIdx];
 			ordP_try[sCommit] = bestRobotSeq;
 			remaining.erase(remaining.begin() + bestRobotIdx);
+			{
+				LocalSearchState Stmp;
+				if (evaluateState(Sseed_rolling, Sseed_rolling.z, &ordP_try, &ordV_ref,
+					true, nRepairFrozen, Stmp))
+					Sseed_rolling = std::move(Stmp);
+			}
 		}
 
 		return true;
@@ -1839,7 +1861,7 @@ namespace mrta {
 		int maxPosTrials)
 	{
 		VecInt remaining = Pset;
-
+		LocalSearchState Sseed_rolling = Sseed;
 		while (!remaining.empty()) {
 			int bestRobotIdx = -1;
 			VecInt bestRobotSeq;
@@ -1896,7 +1918,7 @@ namespace mrta {
 					ordP_eval[s] = seqTry;
 
 					LocalSearchState St;
-					if (!evaluateState(Sseed, Sseed.z, &ordP_eval, &ordV_ref, true, nRepairFrozen, St)) {
+					if (!evaluateState(Sseed_rolling, Sseed_rolling.z, &ordP_eval, &ordV_ref, true, nRepairFrozen, St)) {
 						continue;
 					}
 
@@ -1932,6 +1954,12 @@ namespace mrta {
 			const int sCommit = remaining[bestRobotIdx];
 			ordP_out[sCommit] = bestRobotSeq;
 			remaining.erase(remaining.begin() + bestRobotIdx);
+			{
+				LocalSearchState Stmp;
+				if (evaluateState(Sseed_rolling, Sseed_rolling.z, &ordP_out, &ordV_ref,
+					true, nRepairFrozen, Stmp))
+					Sseed_rolling = std::move(Stmp);
+			}
 		}
 
 		return true;
@@ -2105,8 +2133,27 @@ namespace mrta {
 				std::sort(disruptedRobots.begin(), disruptedRobots.end());
 				disruptedRobots.erase(std::unique(disruptedRobots.begin(), disruptedRobots.end()), disruptedRobots.end());
 
+				// Build strippingRobots: ONLY robots that change MR participation.
+// Do NOT include critRobots — they stay in the schedule unchanged.
+				VecInt strippingRobots;
+				if (combo.empty()) {
+					// Pure-SR combo: strip from critRobots as before
+					strippingRobots = critRobots;
+				}
+				else {
+					for (const auto& sw : combo) {
+						const int oldR = sw[1];
+						const int newR = sw[2];
+						if (std::find(strippingRobots.begin(), strippingRobots.end(), oldR) == strippingRobots.end())
+							strippingRobots.push_back(oldR);
+						if (std::find(strippingRobots.begin(), strippingRobots.end(), newR) == strippingRobots.end())
+							strippingRobots.push_back(newR);
+					}
+				}
+				std::sort(strippingRobots.begin(), strippingRobots.end());
+				strippingRobots.erase(std::unique(strippingRobots.begin(), strippingRobots.end()), strippingRobots.end());
 				VecInt srToStrip;
-				for (int dr : disruptedRobots) {
+				for (int dr : strippingRobots) { // chnged to stripping from disrupted
 					for (int j = 0; j < n(); ++j) {
 						if (z_mr[dr][j] <= 0.5) continue;
 						if (taskIsMR(j)) continue;
@@ -2131,7 +2178,7 @@ namespace mrta {
 				if (exhaustedRr2Combos_.find(comboKey) != exhaustedRr2Combos_.end()) {
 					++totalSkip;
 					++totalComboExhausted;
-					std::cout << "      RR2 combo skipped: exhausted\n";
+					//	std::cout << "      RR2 combo skipped: exhausted\n";
 					continue;
 				}
 
@@ -2839,12 +2886,12 @@ namespace mrta {
 			self.improveCoupledMrBatchOrder(Sout, Pmr);
 			self.improveCoupledMrOrder(Sout, Pmr);
 		}
-		else {
-			std::cout << "      deepEval: skipped MR polish (mksp="
-				<< Sout.mksp << ", base=" << SBase.mksp
-				<< ", max degradation=" << opt_.RR2_POLISH_MAX_DEGRADATION << ")\n";
-		}
-		// Restore outer-search caches.
+		/*	else {
+				std::cout << "      deepEval: skipped MR polish (mksp="
+					<< Sout.mksp << ", base=" << SBase.mksp
+					<< ", max degradation=" << opt_.RR2_POLISH_MAX_DEGRADATION << ")\n";
+			}*/
+			// Restore outer-search caches.
 		self.seenAcceptedStateHashes_ = std::move(savedSeenAcceptedStateHashes);
 		self.seenEvaluatedStateHashes_ = std::move(savedSeenEvaluatedStateHashes);
 		self.seenBatchNeighborhoods_ = std::move(savedSeenBatchNeighborhoods);
