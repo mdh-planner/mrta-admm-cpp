@@ -7,6 +7,7 @@
 #include <random>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 
 namespace mrta {
 
@@ -104,7 +105,16 @@ namespace mrta {
 
         MatrixDouble tauFeas(m, VecDouble(n, std::numeric_limits<double>::quiet_NaN()));
         VecDouble    thetaFeas = thetaInit;
-        VecDouble    tFeas = tInit;
+        VecDouble tFeas = (options.tFeasHint.has_value())
+            ? *options.tFeasHint
+            : tInit;
+
+        // TEMP DIAGNOSTIC
+        if (options.tFeasHint.has_value()) {
+            std::cout << "[Repair] tFeasHint active, values: ";
+            for (int j = 0; j < n; ++j) std::cout << tFeas[j] << " ";
+            std::cout << "\n";
+        }
 
         // ------------------------------------------------------------------
         // startNode, durTask, svcDur  (same structure as v1)
@@ -175,9 +185,28 @@ namespace mrta {
             options.ordersPhys0.has_value() &&
             options.ordersVirt0.has_value();
 
+        const bool useHint =        // ← NEW: warm-start without freezing
+            !options.freezeOrders &&
+            options.ordersPhys0.has_value() &&
+            options.ordersVirt0.has_value();
+
         if (doFreeze) {
             ordersPhys = normalizeOrders(options.ordersPhys0, m);
             ordersVirt = normalizeOrders(options.ordersVirt0, m);
+        }
+        else if (useHint) {         // ← NEW: use hint as starting order, allow re-sorting
+            ordersPhys = normalizeOrders(options.ordersPhys0, m);
+            ordersVirt = normalizeOrders(options.ordersVirt0, m);
+            // Initialize tauFeas from tFeas just like the unfrozen path
+            for (int s = 0; s < m; ++s) {
+                for (int j = 0; j < n; ++j) {
+                    if (zHard[s][j] > 0.5) {
+                        tauFeas[s][j] = std::max(0.0, tFeas[j]);
+                    }
+                }
+            }
+            // Don't sort — the hint order is the starting point.
+            // The main iteration loop will re-sort after computing timing.
         }
         else {
             for (int s = 0; s < m; ++s) {

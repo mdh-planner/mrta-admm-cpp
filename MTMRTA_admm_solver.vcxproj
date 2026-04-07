@@ -136,6 +136,7 @@
     <ClCompile Include="src\solver\AdmmSolver.cpp" />
     <ClCompile Include="src\solver\AssignmentRounder.cpp" />
     <ClCompile Include="src\solver\DerivedDataBuilder.cpp" />
+    <ClCompile Include="src\solver\IlsSolver.cpp" />
     <ClCompile Include="src\solver\LocalSearch.h" />
     <ClCompile Include="src\solver\ParameterScaler.cpp" />
     <ClCompile Include="src\solver\ParameterScaler.h" />
@@ -160,8 +161,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClInclude Include="src\solver\IlsSolver.h" />
+    <ClInclude Include="src\solver\OperatorStats.h" />
     <ClInclude Include="src\solver\PrecedenceGraph.h" />
     <ClInclude Include="src\solver\ScheduleScorer.h" />
+    <ClInclude Include="src\solver\StochasticRounder.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

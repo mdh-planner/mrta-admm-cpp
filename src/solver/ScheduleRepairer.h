@@ -11,6 +11,7 @@ namespace mrta {
         std::optional<std::vector<VecInt>> ordersPhys0;
         std::optional<std::vector<VecInt>> ordersVirt0;
         std::optional<VecDouble>           virtPinnedStart;
+        std::optional<VecDouble>           tFeasHint;  // ← NEW
     };
 
     struct RepairResult {

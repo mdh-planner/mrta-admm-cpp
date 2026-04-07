@@ -65,7 +65,6 @@ namespace mrta {
             const VecDouble& theta,
             const VecDouble& t0) const;
 
-    private:
         MatrixDouble rebalanceSrByMakespan(
             const MatrixDouble& zHard,
             const InstanceData& inst,

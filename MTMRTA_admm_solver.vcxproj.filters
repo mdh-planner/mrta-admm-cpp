@@ -72,6 +72,9 @@
     <ClCompile Include="src\solver\LocalSearch.cpp">
       <Filter>Source Files\Solver</Filter>
     </ClCompile>
+    <ClCompile Include="src\solver\IlsSolver.cpp">
+      <Filter>Source Files\Solver</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommonTypes.h">
@@ -112,6 +115,15 @@
     </ClInclude>
     <ClInclude Include="src\domain\SolverParameters.h">
       <Filter>Header Files\domain</Filter>
+    </ClInclude>
+    <ClInclude Include="src\solver\StochasticRounder.h">
+      <Filter>Header Files\solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\solver\IlsSolver.h">
+      <Filter>Header Files\solver</Filter>
+    </ClInclude>
+    <ClInclude Include="src\solver\OperatorStats.h">
+      <Filter>Header Files\solver</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
