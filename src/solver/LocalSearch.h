@@ -442,6 +442,12 @@ namespace mrta {
             const VecDouble& tWarm,
             int                 nRepairIters) const;
 
+        RepairResult callRepairUnfrozenFixed(
+            const MatrixDouble& zCand,
+            const VecDouble& thetaWarm,
+            const VecDouble& tWarm,
+            int                 nRepairIters) const;
+
         /// Frozen repair — orders are fixed exactly as given in ordP / ordV.
         RepairResult callRepairFrozen(
             const MatrixDouble& zCand,

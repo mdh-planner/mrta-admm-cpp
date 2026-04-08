@@ -125,6 +125,7 @@ namespace mrta {
 		return oss.str();
 	}
 
+
 	// ─────────────────────────────────────────────────────────────────────────────
 //  collectMrGroups_
 //  Scan ordersPhys to find every distinct MR batch and its participating robots.
@@ -223,15 +224,7 @@ namespace mrta {
 				}
 			}
 			skeleton.ordP[r] = keep;
-			// Zero out virtual task assignments on affected robots so the
-			// repairer reassigns them from scratch. Do NOT just clear ordV —
-			// that leaves z[r][virtTask]=1 with no ordV entry, causing the
-			// virtual to disappear entirely from the repaired schedule.
-			for (int t : skeleton.ordV[r]) {
-				if (taskIsVirtual(t)) {
-					skeleton.z[r][t] = 0.0;   // unassign so repairer reassigns
-				}
-			}
+			
 			skeleton.ordV[r].clear();
 		}
 
@@ -413,18 +406,28 @@ namespace mrta {
 
 				// ── Commit insertion into running state ───────────────────────────
 				current.z[chosen->r][t] = 1.0;
-				auto& ord = current.ordP[chosen->r];
-				ord.insert(ord.begin() + chosen->pos, t);
+				if (taskIsVirtual(t)) {
+					current.ordV[chosen->r].push_back(t);
+				}
+				else {
+					auto& ord = current.ordP[chosen->r];
+					ord.insert(ord.begin() + chosen->pos, t);
+				}
 			}
 
 			if (!feasible) continue;
 
 			// ── Full repair: use constructed ordP as warm-start hint ──────────────
 			// skeleton.theta / .t carry the original warm-start values unchanged.
-			const RepairResult rep = callRepairHinted(
+			/*const RepairResult rep = callRepairUnfrozen(
 				current.z,
 				skeleton.theta, skeleton.t,
-				current.ordP, current.ordV,
+				opt_.nRepairReloc);*/
+
+			const RepairResult rep = callRepairUnfrozen(
+				current.z,
+				VecDouble(n(), 0.0),
+				VecDouble(n(), 0.0),
 				opt_.nRepairReloc);
 
 			const ScheduleScore scr = scorer_.scoreScheduleExact(
@@ -435,12 +438,7 @@ namespace mrta {
 
 			// ── Capability guard: reject if repair placed any task on an
 			//    incapable robot (can happen when ordP hint conflicts with cap).
-			bool capOk = true;
-			for (int r = 0; r < m() && capOk; ++r)
-				for (int j = 0; j < n() && capOk; ++j)
-					if (current.z[r][j] > 0.5 && inst_.cap[r][j] < 0.5)
-						capOk = false;
-			if (!capOk) continue;
+			
 
 			LocalSearchState repaired;
 			repaired.z = current.z;
@@ -581,65 +579,7 @@ namespace mrta {
 			};
 
 		LocalSearchState S = buildInitialState(z0, theta0, t0);
-		//// ── Initial state diagnostics ─────────────────────────────────────────
-		//std::cout << "\n=== INITIAL STATE DIAGNOSTICS ===\n";
-		//std::cout << "mksp from repairer: " << S.mksp << "\n";
-
-		// Per - robot load
-			//for (int r = 0; r < m(); ++r) {
-			//	int cnt = 0;
-			//	double arrival = 0.0;
-			//	for (int j = 0; j < n(); ++j)
-			//		if (S.z[r][j] > 0.5) ++cnt;
-			//	if (r < static_cast<int>(S.endDepot.size()))
-			//		arrival = /* robotArrivalToDepot already computed in scorer */ 0.0;
-			//	std::cout << "  Robot " << r << ": " << cnt << " tasks"
-			//		<< " | ordP=[";
-			//	for (int j : S.ordP[r]) std::cout << j << " ";
-			//	std::cout << "]\n";
-
-			//	std::cout << "  Robot " << r << ": phys=[";
-			//	for (int j : S.ordP[r]) std::cout << j << " ";
-			//	std::cout << "] virt=[";
-			//	for (int j : S.ordV[r]) std::cout << j << " ";
-			//	std::cout << "]\n";
-			//}
-
-			//// MR task sync check: tau[s][j] should equal theta[j] for all assigned s
-			//for (int j = 0; j < n(); ++j) {
-			//	if (!inst_.isMR[j]) continue;
-			//	std::cout << "  MR task " << j << ": theta=" << S.theta[j];
-			//	for (int r = 0; r < m(); ++r) {
-			//		if (S.z[r][j] > 0.5)
-			//			std::cout << " | tau[" << r << "]=" << S.tau[r][j];
-			//	}
-			//	std::cout << "\n";
-			//}
-
-			//
-
-			//std::cout << "=== END INITIAL STATE DIAGNOSTICS ===\n\n";
-
-
-			//// After buildInitialState in LocalSearch::run():
-			//std::cout << "=== MR CAPACITY CHECK ===\n";
-			//for (int j = 0; j < n(); ++j) {
-			//	if (!inst_.isMR[j]) continue;
-			//	std::vector<int> capable, assigned;
-			//	for (int r = 0; r < m(); ++r) {
-			//		if (inst_.cap[r][j] > 0.5) capable.push_back(r);
-			//		if (S.z[r][j] > 0.5) assigned.push_back(r);
-			//	}
-			//	std::cout << "  MR task " << j << " (k=" << inst_.k[j] << ")"
-			//		<< " capable=" << capable.size()
-			//		<< " assigned=" << assigned.size()
-			//		<< " swap_options=" << (capable.size() - assigned.size()) << "\n";
-			//}
-			//std::cout << "=== END MR CAPACITY CHECK ===\n";
-			//std::cout << std::endl; std::cout << std::endl;
-			//std::cout << "LS init: mksp = " << S.mksp << "\n";
-			//std::cout << std::endl;
-
+		
 			double mkspPrev = S.mksp;
 
 		for (int outer = 0; outer < opt_.nOuter; ++outer) {
@@ -656,9 +596,9 @@ namespace mrta {
 			}
 
 			bool improved = false;
-
+			// without this the solution is not feasible. Check why.
 			improved = improveIntraOrder(S, opt_.nInnerOrder) || improved;
-			//improved = improveMrOrder(S) || improved;
+			improved = improveMrOrder(S) || improved;
 			//did = improveJointMrOrderSr(S);
 
 			/*if (did) {
@@ -2862,17 +2802,18 @@ namespace mrta {
 	// Checks both that no tasks were lost AND that every assigned task
 	// is on a robot that is capable of performing it.
 		auto assignmentFeasible = [&](const LocalSearchState& cand) -> bool {
-			int candN = 0, origN = 0;
+			int candPhys = 0, origPhys = 0;
 			for (int r = 0; r < m(); ++r) {
 				for (int j = 0; j < n(); ++j) {
+					if (taskIsVirtual(j)) continue;   // virtuals may move, skip count
 					if (cand.z[r][j] > 0.5) {
-						++candN;
-						if (inst_.cap[r][j] < 0.5) return false;  // incapable robot
+						++candPhys;
+						if (inst_.cap[r][j] < 0.5) return false;
 					}
-					if (S.z[r][j] > 0.5) ++origN;
+					if (S.z[r][j] > 0.5) ++origPhys;
 				}
 			}
-			return candN == origN;  // no tasks lost or duplicated
+			return candPhys == origPhys;
 			};
 
 		// ── Helper: try one (groups, z_base) configuration ────────────────────────

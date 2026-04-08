@@ -52,12 +52,7 @@ namespace mrta {
         // - pinned tStart = max(EST, virtPinnedStart) in Step C
         // - RANDOMIZE_TIES = true in reorder step
         // ----------------------------------------------------------------
-        RepairResult repairPushforward2(
-            const MatrixDouble& zHard,
-            const InstanceData& inst,
-            const VecDouble& thetaInit,
-            const VecDouble& tInit,
-            const RepairOptions& options = {}) const;
+       
 
     private:
         static std::vector<VecInt> normalizeOrders(

@@ -14,7 +14,7 @@ THETA
 TAU
 nan nan 136 nan nan nan nan 86 33 nan nan nan
 37 76 nan 239 179 278 nan nan nan 313 nan nan
-nan nan nan 239 179 278 72 nan nan 313 119 214
+nan nan nan 239 179 278 72 nan nan 313 102 119
 
 END_DEPOT
 0 1 1

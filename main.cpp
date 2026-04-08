@@ -26,7 +26,7 @@
 // To test ADMM contribution: set to 1 for random, 0 for real ADMM
 #define USE_RANDOM_ADMM 0
 #define VERBOSE 0
-#define VERBOSE0 0
+#define VERBOSE0 1
 
 void printVector(const std::string& label, const mrta::VecDouble& v);
 void printVectorInt1Based(const std::string& label, const mrta::VecInt& v);
@@ -106,7 +106,7 @@ int main() {
 		// Optimal = [1-14,16,30
 		// Sub-Optimal = [15,17-29
 		mrta::UserConfig config;
-		config.instId = 11;
+		config.instId = 15;
 		config.cpEnabled = false;
 		config.useFixedEndDepot = false;
 
@@ -200,7 +200,7 @@ int main() {
 
 		// ── ILS options ───────────────────────────────────────────────────────
 		mrta::IlsOptions ilsOpts;
-		ilsOpts.maxIter = 10;   // ILS iterations *per seed* (each = one full LS)
+		ilsOpts.maxIter = 1;   // ILS iterations *per seed* (each = one full LS)
 		ilsOpts.kPerturbMin = 1;
 		ilsOpts.kPerturbMax = 10;
 		ilsOpts.restartAfter = 3;

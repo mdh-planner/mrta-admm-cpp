@@ -1,0 +1,24 @@
+INSTANCE 19
+ROBOTS 5
+TASKS 12
+DEPOTS 2
+
+Z
+0 1 1 0 1 0 1 0 0 0 1 0
+1 0 1 0 1 0 1 0 0 0 0 0
+0 0 0 0 0 0 0 1 1 1 0 0
+0 0 1 0 1 1 1 0 0 0 0 0
+0 0 0 1 0 0 0 1 1 1 0 1
+
+THETA
+2.2000000000000002 7.6799999999999997 157 13.48 99 4.8800000000000008 34 121 55 162 10 42
+
+TAU
+nan 175 157 nan 99 nan 34 nan nan nan 223 nan
+198 nan 157 nan 99 nan 34 nan nan nan nan nan
+nan nan nan nan nan nan nan 121 55 162 nan nan
+nan nan 157 nan 99 220 34 nan nan nan nan nan
+nan nan nan 213 nan nan nan 121 55 162 nan 223
+
+END_DEPOT
+1 1 0 1 0
